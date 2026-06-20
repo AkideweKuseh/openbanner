@@ -1,0 +1,10 @@
+{
+  "width": 1200, "height": 630, "backgroundColor": "#0f172a",
+  "elements": [
+    {"type":"rect","left":0,"top":0,"width":14,"height":630,"color":"#ccff00"},
+    {"type":"text","text":"Summer Sale","left":80,"top":150,"fontFamily":"Inter","fontSize":120,"fontWeight":"bold","effect":"gradient"},
+    {"type":"text","text":"Up to 50 percent off everything this weekend","left":84,"top":320,"fontFamily":"Inter","fontSize":36,"color":"#cbd5e1","maxWidth":900},
+    {"type":"rect","left":84,"top":430,"width":300,"height":64,"color":"#ccff00","radius":32},
+    {"type":"text","text":"Shop Now","left":116,"top":444,"fontFamily":"Inter","fontSize":30,"fontWeight":"bold","color":"#0f172a"}
+  ]
+}

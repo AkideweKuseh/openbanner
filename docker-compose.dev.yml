@@ -1,0 +1,88 @@
+# Local development stack for the OpenBanner create → text → generate → download loop.
+# Runs ONLY the rendering API (+ bundled Chromium) and one nginx that serves the UI
+# AND reverse-proxies the API on the same origin (http://localhost:8080).
+# Same origin => no CORS, no TLS, no subdomains. Includes a local MinIO for image
+# uploads (no n8n — that's a separate instance).
+#
+#   docker compose -f docker-compose.dev.yml up -d --build
+#   open http://localhost:8080
+
+networks:
+  internal_automation:
+    driver: bridge
+
+volumes:
+  ob-templates:
+  ob-minio-data:
+
+services:
+  rendering-api:
+    build: ./api
+    container_name: ob-dev-renderer
+    env_file: .env
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - TEMPLATES_DIR=/data/templates
+    networks: [internal_automation]
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /dev/shm:size=256m
+    volumes:
+      - ob-templates:/data/templates
+    mem_limit: 1g
+    depends_on:
+      - minio
+    restart: unless-stopped
+    # No host ports: only reachable via nginx-dev on the internal network.
+
+  # Local object storage for uploaded source images. No host ports exposed — the API
+  # reaches it over the internal network and proxies reads via GET /v1/images/:key.
+  minio:
+    image: minio/minio:latest
+    container_name: ob-dev-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ob-minio-data:/data
+    networks: [internal_automation]
+    restart: unless-stopped
+
+  # One-shot: create the bucket + scoped app account the API uses, then exit.
+  minio-init:
+    image: minio/mc:latest
+    container_name: ob-dev-minio-init
+    depends_on:
+      - minio
+    env_file: .env
+    networks: [internal_automation]
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}; do sleep 2; done;
+      mc mb --ignore-existing local/$${MINIO_BUCKET_NAME};
+      printf '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:PutObject\",\"s3:GetObject\",\"s3:ListBucket\"],\"Resource\":[\"arn:aws:s3:::%s\",\"arn:aws:s3:::%s/*\"]}]}' $${MINIO_BUCKET_NAME} $${MINIO_BUCKET_NAME} > /tmp/policy.json;
+      mc admin policy create local banner-rw /tmp/policy.json || true;
+      mc admin user add local $${MINIO_APP_USER} $${MINIO_APP_PASSWORD} || true;
+      mc admin policy attach local banner-rw --user $${MINIO_APP_USER} || true;
+      echo 'minio init complete';
+      "
+    restart: "no"
+
+  nginx-dev:
+    image: nginx:1.27-alpine
+    container_name: ob-dev-nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+      - ./ui:/usr/share/nginx/html:ro
+    depends_on:
+      - rendering-api
+    networks: [internal_automation]
+    restart: unless-stopped

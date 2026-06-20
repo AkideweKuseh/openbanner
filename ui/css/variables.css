@@ -1,0 +1,109 @@
+/* ═══════════════════════════════════════════════════════════
+   OpenBanner — Design Tokens
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Palette (Light Mode + Lime Green Accent) ── */
+  --ob-bg-deep:        #f3f4f6; /* Outer background / canvas wrapper */
+  --ob-bg-base:        #ffffff; /* Main panels */
+  --ob-bg-surface:     #ffffff; /* Sidebars/Nav */
+  --ob-bg-elevated:    #f9fafb; /* Cards / Modules */
+  --ob-bg-overlay:     #f3f4f6;
+  --ob-bg-hover:       #f3f4f6;
+
+  --ob-border-subtle:  #f3f4f6;
+  --ob-border-default: #e5e7eb;
+  --ob-border-strong:  #d1d5db;
+  --ob-border-accent:  #ccff00;
+
+  --ob-text-primary:   #111827; /* Dark gray */
+  --ob-text-secondary: #4b5563; /* Medium gray */
+  --ob-text-tertiary:  #9ca3af; /* Light gray */
+  --ob-text-inverse:   #111827; /* Dark text on lime green */
+
+  /* Accents */
+  --ob-accent-lime:    #ccff00; /* Primary brand color from reference */
+  --ob-accent-cyan:    #0ea5e9; /* Kept for compatibility but shifted to softer blue */
+  --ob-accent-magenta: #ec4899;
+  --ob-accent-violet:  #8b5cf6;
+  --ob-accent-green:   #10b981;
+  --ob-accent-amber:   #f59e0b;
+  --ob-accent-red:     #ef4444;
+
+  --ob-gradient-brand: linear-gradient(135deg, #ccff00 0%, #b3e600 100%);
+  --ob-gradient-cyan:  linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%);
+  --ob-gradient-glass: #ffffff; /* Removed glass for flat UI */
+
+  /* ── Typography ── */
+  --ob-font-sans:   'Inter', 'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ob-font-mono:   'Space Grotesk', 'JetBrains Mono', monospace;
+
+  /* Focus ring (accessibility — visible on keyboard nav) */
+  --ob-ring:        rgba(204, 255, 0, 0.55);
+  --ob-ring-offset: 2px;
+
+  --ob-text-xs:     0.6875rem;   /* 11px */
+  --ob-text-sm:     0.75rem;     /* 12px */
+  --ob-text-base:   0.8125rem;   /* 13px */
+  --ob-text-md:     0.875rem;    /* 14px */
+  --ob-text-lg:     1rem;        /* 16px */
+  --ob-text-xl:     1.25rem;     /* 20px */
+  --ob-text-2xl:    1.5rem;      /* 24px */
+  --ob-text-3xl:    2rem;        /* 32px */
+
+  --ob-weight-normal: 400;
+  --ob-weight-medium: 500;
+  --ob-weight-semi:   600;
+  --ob-weight-bold:   700;
+
+  --ob-leading-tight:  1.2;
+  --ob-leading-normal: 1.5;
+
+  /* ── Spacing ── */
+  --ob-space-1:  0.25rem;   /* 4px */
+  --ob-space-2:  0.5rem;    /* 8px */
+  --ob-space-3:  0.75rem;   /* 12px */
+  --ob-space-4:  1rem;      /* 16px */
+  --ob-space-5:  1.25rem;   /* 20px */
+  --ob-space-6:  1.5rem;    /* 24px */
+  --ob-space-8:  2rem;      /* 32px */
+  --ob-space-10: 2.5rem;    /* 40px */
+  --ob-space-12: 3rem;      /* 48px */
+
+  /* ── Radii (Softer) ── */
+  --ob-radius-sm:   6px;
+  --ob-radius-md:   10px;
+  --ob-radius-lg:   16px;
+  --ob-radius-xl:   24px;
+  --ob-radius-2xl:  32px;
+  --ob-radius-full: 9999px;
+
+  /* ── Shadows (Subtle / Flat) ── */
+  --ob-shadow-sm:   0 1px 2px rgba(0, 0, 0, 0.05);
+  --ob-shadow-md:   0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --ob-shadow-lg:   0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+  --ob-shadow-xl:   0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+  --ob-shadow-glow-cyan:    0 0 0 2px rgba(204, 255, 0, 0.5); /* Re-purposed to lime */
+  --ob-shadow-glow-magenta: 0 0 0 2px rgba(204, 255, 0, 0.5);
+
+  /* ── Transitions (UX Pro Max 150-300ms) ── */
+  --ob-ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ob-ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ob-duration-fast:    150ms;
+  --ob-duration-normal:  250ms;
+  --ob-duration-slow:    350ms;
+
+  /* ── Z-index ── */
+  --ob-z-canvas:    1;
+  --ob-z-panel:     10;
+  --ob-z-toolbar:   20;
+  --ob-z-dropdown:  30;
+  --ob-z-modal:     40;
+  --ob-z-toast:     50;
+
+  /* ── Layout ── */
+  --ob-nav-height:     56px;
+  --ob-sidebar-width:  280px;
+  --ob-inspector-width: 300px;
+  --ob-toolbar-height:  48px;
+}

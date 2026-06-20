@@ -1,0 +1,89 @@
+networks:
+  internal_automation:
+    driver: bridge
+
+volumes:
+  minio-data:
+  templates-data:
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: bannerbear-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.generated.conf:/etc/nginx/nginx.conf:ro   # rendered from nginx.conf.template by deploy.sh
+      - ./certs:/etc/nginx/certs:ro
+      - ./ui:/usr/share/nginx/html:ro
+    depends_on:
+      - rendering-api
+      - minio
+    networks: [internal_automation]
+    restart: unless-stopped
+
+  rendering-api:
+    build: ./api
+    container_name: bannerbear-renderer
+    env_file: .env
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+    networks: [internal_automation]
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /dev/shm:size=256m
+    volumes:
+      # Persistent template store. Required: the rootfs is read-only, so without this
+      # named volume the API cannot write templates at /data/templates.
+      - templates-data:/data/templates
+    mem_limit: 1g
+    depends_on:
+      - minio
+    restart: unless-stopped
+    # No host ports: only reachable via nginx on the internal network.
+    # Uses the scoped MINIO_APP_USER creds (from .env) to store/serve uploaded images.
+
+  minio:
+    image: minio/minio:latest
+    container_name: bannerbear-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    networks: [internal_automation]
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  # One-shot: create bucket + scoped service account, then exit.
+  minio-init:
+    image: minio/mc:latest
+    container_name: bannerbear-minio-init
+    depends_on:
+      - minio
+    env_file: .env
+    networks: [internal_automation]
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}; do sleep 2; done;
+      mc mb --ignore-existing local/$${MINIO_BUCKET_NAME};
+      printf '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:PutObject\",\"s3:GetObject\",\"s3:ListBucket\"],\"Resource\":[\"arn:aws:s3:::%s\",\"arn:aws:s3:::%s/*\"]}]}' $${MINIO_BUCKET_NAME} $${MINIO_BUCKET_NAME} > /tmp/policy.json;
+      mc admin policy create local banner-rw /tmp/policy.json || true;
+      mc admin user add local $${MINIO_APP_USER} $${MINIO_APP_PASSWORD} || true;
+      mc admin policy attach local banner-rw --user $${MINIO_APP_USER} || true;
+      echo 'minio init complete';
+      "
+    restart: "no"
+
+  # NOTE: n8n is NOT part of this stack. It runs on a separate instance and calls the
+  # render API server-to-server (https://api.<domain>, X-API-Key). That's a plain HTTP
+  # call with no CORS involved, so no configuration is needed here to support it.

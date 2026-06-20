@@ -1,0 +1,23 @@
+{
+  "name": "open-banner-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "puppeteer": "^25.1.0",
+    "zod": "^3.23.0",
+    "pino": "^9.5.0",
+    "pino-http": "^10.3.0",
+    "prom-client": "^15.1.0",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^8.0.0",
+    "minio": "^8.0.1",
+    "p-queue": "^8.0.1"
+  }
+}

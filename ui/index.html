@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenBanner — Visual Banner Designer</title>
+  <meta name="description" content="Design, preview, and export banners with the OpenBanner visual editor.">
+
+  <!-- Google Fonts: Various Families -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Montserrat:wght@400;600;800&family=Open+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/designer.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23ccff00'/><text x='16' y='22' text-anchor='middle' fill='%23111827' font-family='sans-serif' font-weight='bold' font-size='16'>OB</text></svg>">
+</head>
+<body>
+  <!-- ═══ Auth Gate (Login) ═══ -->
+  <div id="auth-gate" class="auth-gate">
+    <div class="auth-card">
+      <div class="auth-logo">OB</div>
+      <h1 class="auth-title">Welcome to OpenBanner</h1>
+      <p class="auth-subtitle">Sign in to design, preview, and export banners.</p>
+      <form id="login-form" class="auth-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="login-email">Email</label>
+          <input type="email" class="form-input" id="login-email" placeholder="you@studio.com" autocomplete="email" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="login-password">Password</label>
+          <input type="password" class="form-input" id="login-password" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+        <div class="auth-error" id="login-error" role="alert" aria-live="polite"></div>
+        <button type="submit" class="btn btn--primary btn--lg auth-submit">Sign in</button>
+      </form>
+      <p class="auth-hint">Demo mode — any valid email and a 4+ character password will sign you in.</p>
+    </div>
+  </div>
+
+  <div id="app" class="app-layout">
+    
+    <!-- ═══ Far Left Slim Nav ═══ -->
+    <nav class="slim-nav">
+      <div class="slim-nav__logo">OB</div>
+      <div class="slim-nav__links">
+        <button class="slim-nav__btn slim-nav__btn--active" data-tab="designer" id="tab-designer" data-tooltip="Designer">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+        </button>
+        <button class="slim-nav__btn" data-tab="dashboard" id="tab-dashboard" data-tooltip="Dashboard">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        </button>
+      </div>
+      <div class="slim-nav__spacer"></div>
+      <div class="slim-nav__links">
+        <button class="slim-nav__btn" id="btn-api-key" data-tooltip="API Settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+        </button>
+        <button class="slim-nav__btn" id="btn-logout" data-tooltip="Sign out">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        </button>
+      </div>
+    </nav>
+
+    <!-- ═══ Main App Area ═══ -->
+    <div class="app-content">
+      
+      <!-- ═══ Top Header / Toolbar ═══ -->
+      <header class="top-header">
+        <div class="header-left">
+          <!-- Home state: title -->
+          <div class="header-home-left">
+            <span class="header-title">Templates</span>
+          </div>
+          <!-- Editor state: back + editable template name -->
+          <div class="header-editor-left">
+            <button class="btn btn--ghost btn--icon" id="btn-back-home" data-tooltip="Back to templates" aria-label="Back to templates">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </button>
+            <input type="text" id="active-template-name" class="template-name-input" value="Untitled" spellcheck="false" aria-label="Template name">
+          </div>
+        </div>
+
+        <div class="header-center">
+          <div class="toolbar-group">
+            <button class="toolbar-btn" id="btn-undo" data-tooltip="Undo (Ctrl+Z)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"></path></svg></button>
+            <button class="toolbar-btn" id="btn-redo" data-tooltip="Redo (Ctrl+Y)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"></path></svg></button>
+          </div>
+          <div class="toolbar-divider"></div>
+          <div class="toolbar-group">
+            <button class="toolbar-btn toolbar-btn--active" data-tooltip="Select"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path><path d="M13 13l6 6"></path></svg></button>
+            <button class="toolbar-btn" id="add-text" draggable="true" data-tooltip="Add Text"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg></button>
+            <button class="toolbar-btn" id="add-rect" draggable="true" data-tooltip="Add Rectangle"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" ry="3"></rect></svg></button>
+            <button class="toolbar-btn" id="add-image" draggable="true" data-tooltip="Add Image"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></button>
+          </div>
+          <div class="toolbar-divider"></div>
+          <div class="toolbar-group">
+            <button class="toolbar-btn" id="btn-zoom-out" aria-label="Zoom out">−</button>
+            <span class="zoom-text" id="zoom-display">100%</span>
+            <button class="toolbar-btn" id="btn-zoom-in" aria-label="Zoom in">+</button>
+            <button class="toolbar-btn" id="btn-zoom-fit" data-tooltip="Fit to screen" aria-label="Fit to screen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M21 8V5a2 2 0 0 0-2-2h-3"></path><path d="M3 16v3a2 2 0 0 0 2 2h3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg></button>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <!-- Editor actions -->
+          <div class="editor-actions">
+            <button class="btn btn--ghost btn--icon" id="btn-json-import" data-tooltip="Import JSON"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
+            <button class="btn btn--ghost btn--icon" id="btn-json-export" data-tooltip="Export JSON"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg></button>
+            <button class="btn btn--ghost" id="btn-export-api" data-tooltip="Show render endpoint + slot parameters for this template">API Call</button>
+            <button class="btn btn--secondary" id="btn-publish-api" data-tooltip="Save this design as a reusable API template">Publish to API</button>
+            <button class="btn btn--secondary" id="btn-save-template" data-tooltip="Save (overwrites this template)">Save</button>
+            <button class="btn btn--primary" id="btn-generate">Publish</button>
+          </div>
+          <!-- Home action -->
+          <button class="btn btn--primary home-actions" id="btn-create-template">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            New Template
+          </button>
+        </div>
+      </header>
+
+      <!-- ═══ Views ═══ -->
+      <div class="main-views">
+        
+        <!-- DESIGNER VIEW (home = template grid · editor = canvas) -->
+        <div class="view designer--home" id="view-designer">
+
+          <!-- ── HOME: Template Grid ── -->
+          <div class="designer-home" id="designer-home">
+            <div class="designer-home__body">
+              <div class="templates-grid-home" id="custom-templates-grid">
+                <!-- populated by JS -->
+              </div>
+              <div class="home-empty" id="home-empty" style="display:none;">
+                <div class="home-empty__icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                </div>
+                <div class="home-empty__title">No templates yet</div>
+                <div class="home-empty__text">Create your first banner template to get started.</div>
+                <button class="btn btn--primary btn--lg" id="btn-create-template-empty">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  New Template
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── EDITOR: Sidebar / Canvas / Inspector ── -->
+          <div class="designer-editor" id="designer-editor">
+
+            <!-- Layers Sidebar (Layers only) -->
+            <aside class="designer__sidebar" id="designer-sidebar">
+              <div class="sidebar__section" id="section-layers" style="flex:1;display:flex;flex-direction:column;overflow:hidden;border-bottom:none;">
+                <div class="sidebar__title" style="display:flex;justify-content:space-between;align-items:center;">
+                  Layers
+                  <span id="layer-count" class="badge">0</span>
+                </div>
+                <div class="layers-list" id="layers-list">
+                  <!-- populated by JS -->
+                </div>
+              </div>
+
+              <div class="sidebar__section" style="border-top: 1px solid var(--ob-border-default);">
+                <div class="sidebar__title">Canvas Size</div>
+                <div class="presets-grid" id="canvas-presets">
+                  <button class="preset-btn preset-btn--active" data-w="1200" data-h="630">
+                    <span>OG Image</span>
+                  </button>
+                  <button class="preset-btn" data-w="1080" data-h="1080">
+                    <span>Square</span>
+                  </button>
+                  <button class="preset-btn" data-w="1920" data-h="1080">
+                    <span>HD Video</span>
+                  </button>
+                  <button class="preset-btn" data-w="1500" data-h="500">
+                    <span>Twitter</span>
+                  </button>
+                </div>
+              </div>
+            </aside>
+
+            <!-- Canvas Area -->
+            <div class="designer__canvas-area">
+              <div class="canvas-top-bar">
+                <span class="canvas-size-display" id="canvas-size-display">1200 × 630</span>
+                <div class="canvas-actions" id="canvas-actions" style="display: none;">
+                  <button class="btn btn--ghost btn--icon" id="btn-replace-image" data-tooltip="Replace image" style="display:none;" aria-label="Replace image"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></button>
+                  <button class="btn btn--ghost btn--icon" id="btn-delete-selected" data-tooltip="Delete (Del)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                  <button class="btn btn--ghost btn--icon" id="btn-duplicate" data-tooltip="Duplicate (Ctrl+D)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+                </div>
+              </div>
+              <div class="canvas-viewport" id="canvas-viewport">
+                <div class="canvas-wrapper" id="canvas-wrapper">
+                  <div class="canvas-frame" id="canvas-frame">
+                    <!-- Elements rendered here by JS -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Inspector (Design only) -->
+            <aside class="designer__inspector" id="designer-inspector">
+              <div class="inspector__tabs">
+                <div class="inspector__single-title">Design</div>
+              </div>
+
+              <div class="inspector__empty" id="inspector-empty">
+                <div class="inspector__empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></div>
+                <div>Select an element to edit properties.</div>
+              </div>
+              <div id="inspector-content" style="display:none;">
+                <!-- populated dynamically by JS -->
+              </div>
+            </aside>
+
+          </div>
+        </div>
+
+        <!-- DASHBOARD VIEW -->
+        <div class="view" id="view-dashboard">
+          <div class="dashboard" id="dashboard-container" style="padding: 2rem; max-width: 1200px; margin: 0 auto; width: 100%; overflow-y: auto;">
+            <!-- Health Status -->
+            <div class="dashboard-card">
+              <div class="dashboard__section-header">
+                <div>
+                  <div class="dashboard__section-title">System Health</div>
+                  <div class="dashboard__section-subtitle">Last checked: <span id="health-last-check">never</span></div>
+                </div>
+                <button class="btn btn--secondary btn--sm" id="btn-refresh-health">Refresh</button>
+              </div>
+              <div class="health-grid" style="margin-top:var(--ob-space-4);">
+                <div class="health-card" id="health-api">
+                  <div class="health-card__indicator health-card__indicator--unknown" id="health-api-indicator"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
+                  <div class="health-card__info">
+                    <div class="health-card__name">Render API</div>
+                    <div class="health-card__detail" id="health-api-detail">Checking...</div>
+                  </div>
+                  <span class="badge badge--amber" id="health-api-badge"><span class="badge__dot"></span> Unknown</span>
+                </div>
+                <div class="health-card" id="health-chromium">
+                  <div class="health-card__indicator health-card__indicator--unknown" id="health-chromium-indicator"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
+                  <div class="health-card__info">
+                    <div class="health-card__name">Chromium Engine</div>
+                    <div class="health-card__detail" id="health-chromium-detail">Checking...</div>
+                  </div>
+                  <span class="badge badge--amber" id="health-chromium-badge"><span class="badge__dot"></span> Unknown</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Metrics -->
+            <div class="dashboard-card" style="margin-top: 2rem;">
+              <div class="dashboard__section-header">
+                <div>
+                  <div class="dashboard__section-title">Render Metrics</div>
+                </div>
+              </div>
+              <div class="metrics-grid" style="margin-top:var(--ob-space-4);" id="metrics-grid">
+                <div class="metric-card metric-card--cyan">
+                  <div class="metric-card__header">
+                    <span class="metric-card__label">Total Renders</span>
+                  </div>
+                  <div class="metric-card__value metric-card__value--cyan" id="metric-total-renders">—</div>
+                </div>
+                <div class="metric-card metric-card--magenta">
+                  <div class="metric-card__header">
+                    <span class="metric-card__label">Avg Duration</span>
+                  </div>
+                  <div class="metric-card__value metric-card__value--magenta" id="metric-avg-duration">—</div>
+                </div>
+                <div class="metric-card metric-card--green">
+                  <div class="metric-card__header">
+                    <span class="metric-card__label">Queue Depth</span>
+                  </div>
+                  <div class="metric-card__value metric-card__value--green" id="metric-queue-depth">—</div>
+                </div>
+                <div class="metric-card metric-card--red">
+                  <div class="metric-card__header">
+                    <span class="metric-card__label">Error Rate</span>
+                  </div>
+                  <div class="metric-card__value metric-card__value--red" id="metric-error-rate">—</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent Renders -->
+            <div class="dashboard-card" style="margin-top: 2rem;">
+              <div class="dashboard__section-header">
+                <div>
+                  <div class="dashboard__section-title">Recent Renders</div>
+                  <div class="dashboard__section-subtitle"><span id="render-history-count">0</span> renders stored locally</div>
+                </div>
+                <button class="btn btn--secondary btn--sm" id="btn-clear-history">Clear History</button>
+              </div>
+              <div id="renders-container" style="margin-top:var(--ob-space-4);">
+                <div class="empty-state" id="renders-empty">
+                  <div class="empty-state__icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></div>
+                  <div class="empty-state__text">No renders yet. Go to the Designer tab and generate your first banner!</div>
+                </div>
+                <div class="renders-gallery" id="renders-gallery" style="display:none;">
+                  <!-- populated by JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Export Drawer ═══ -->
+  <div class="export-drawer" id="export-drawer">
+    <div class="export-drawer__header">
+      <span class="export-drawer__title">Export Banner</span>
+      <button class="btn btn--ghost btn--icon" id="btn-close-export"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+    </div>
+    <div class="export-drawer__body">
+      <div class="form-group">
+        <label class="form-label">Format</label>
+        <select class="form-input" id="export-format">
+          <option value="png">PNG (lossless)</option>
+          <option value="jpeg">JPEG (lossy)</option>
+          <option value="webp">WebP (modern)</option>
+        </select>
+      </div>
+      <div class="form-group" id="export-quality-group">
+        <label class="form-label">Quality: <span id="export-quality-value">90</span>%</label>
+        <input type="range" min="1" max="100" value="90" id="export-quality">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Scale Factor</label>
+        <select class="form-input" id="export-scale">
+          <option value="1">1× (standard)</option>
+          <option value="2">2× (retina)</option>
+          <option value="3">3× (ultra)</option>
+        </select>
+      </div>
+      <hr class="divider">
+      <div class="export-preview" id="export-preview">
+        <div class="export-preview__loading" id="export-loading" style="display:none;">
+          <div class="export-spinner"></div>
+          <span>Rendering...</span>
+        </div>
+        <div id="export-result" style="display:none;"></div>
+        <div id="export-placeholder" style="color:var(--ob-text-tertiary);font-size:var(--ob-text-sm);">
+          Click "Render" to preview
+        </div>
+      </div>
+    </div>
+    <div class="export-drawer__footer">
+      <button class="btn btn--primary btn--lg" id="btn-render" style="flex:1;">Render</button>
+      <button class="btn btn--secondary btn--lg" id="btn-download" style="flex:1;" disabled>Download</button>
+    </div>
+  </div>
+
+  <!-- ═══ API Key Modal ═══ -->
+  <div class="modal-backdrop" id="api-key-modal">
+    <div class="modal">
+      <div class="modal__title">API Configuration</div>
+      <div class="modal__desc">
+        Enter your OpenBanner API key and the render API base URL to connect the designer to your server.
+      </div>
+      <div class="form-group" style="margin-bottom:var(--ob-space-4);">
+        <label class="form-label">API Base URL</label>
+        <input type="url" class="form-input" id="input-api-url" placeholder="https://api.your-domain.com" value="">
+      </div>
+      <div class="form-group" style="margin-bottom:var(--ob-space-6);">
+        <label class="form-label">API Key</label>
+        <input type="password" class="form-input" id="input-api-key" placeholder="Enter your API_SECRET_TOKEN">
+      </div>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" id="btn-cancel-api-key">Cancel</button>
+        <button class="btn btn--primary" id="btn-save-api-key">Save & Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Create Template Modal ═══ -->
+  <div class="modal-backdrop" id="create-template-modal">
+    <div class="modal">
+      <div class="modal__title">Create New Template</div>
+      <div class="modal__desc">Start a new blank banner template. Pick a name and canvas size.</div>
+      <div class="form-group" style="margin-bottom:var(--ob-space-4);">
+        <label class="form-label">Template Name</label>
+        <input type="text" class="form-input" id="input-template-name" placeholder="e.g. My Newsletter Banner" value="">
+      </div>
+      <div class="form-group" style="margin-bottom:var(--ob-space-4);">
+        <label class="form-label">Template Size</label>
+        <div class="presets-grid" id="modal-template-presets">
+          <button class="preset-btn preset-btn--active" data-size="current">
+            <span>Current Size</span>
+          </button>
+          <button class="preset-btn" data-size="1200x630">
+            <span>OG Image</span>
+          </button>
+          <button class="preset-btn" data-size="1080x1080">
+            <span>Square</span>
+          </button>
+          <button class="preset-btn" data-size="1920x1080">
+            <span>HD Video</span>
+          </button>
+          <button class="preset-btn" data-size="1500x500">
+            <span>Twitter</span>
+          </button>
+          <button class="preset-btn" data-size="custom">
+            <span>Custom</span>
+          </button>
+        </div>
+      </div>
+      <div class="form-group" id="group-template-custom-size" style="display:none; gap:var(--ob-space-2); margin-bottom:var(--ob-space-4);">
+        <div style="flex:1;">
+          <label class="form-label">Width</label>
+          <input type="number" class="form-input" id="input-template-w" value="1200">
+        </div>
+        <div style="flex:1;">
+          <label class="form-label">Height</label>
+          <input type="number" class="form-input" id="input-template-h" value="630">
+        </div>
+      </div>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" id="btn-cancel-template">Cancel</button>
+        <button class="btn btn--primary" id="btn-confirm-create-template">Create Template</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Export API Endpoint Modal ═══ -->
+  <div class="modal-backdrop" id="export-api-modal">
+    <div class="modal" style="max-width:680px;">
+      <div class="modal__title">API Endpoint — <span id="export-api-name">Template</span></div>
+      <div class="modal__desc">Render this template by ID and inject text into its slots. Copy any block into n8n or a script. Slots are generated from this template's text elements.</div>
+      <div id="export-api-body" style="margin-top:var(--ob-space-2);"></div>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" id="btn-close-export-api">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Toast Container ═══ -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ═══ Scripts ═══ -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

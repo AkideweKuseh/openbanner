@@ -1,0 +1,6 @@
+.env
+node_modules/
+certs/*.pem
+certs/.htpasswd
+nginx/nginx.generated.conf
+*.log
