@@ -1,6 +1,6 @@
 # OpenBanner
 
-Self-hosted banner-image generation: design a template in the browser, name text **slots**,
+Self-hosted templated image generation: design a template in the browser, name text **slots**,
 publish it, then render variations by ID via a simple HTTP API (inject text + format, get a
 PNG/JPEG/WebP back). Uploaded images are stored in object storage; rendering is done by
 headless Chromium.
