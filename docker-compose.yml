@@ -10,12 +10,11 @@ services:
   nginx:
     image: nginx:1.27-alpine
     container_name: bannerbear-nginx
+    # Published only on localhost — the HOST nginx terminates TLS and proxies to this.
     ports:
-      - "80:80"
-      - "443:443"
+      - "127.0.0.1:8080:80"
     volumes:
-      - ./nginx/nginx.generated.conf:/etc/nginx/nginx.conf:ro   # rendered from nginx.conf.template by deploy.sh
-      - ./certs:/etc/nginx/certs:ro
+      - ./nginx/nginx.generated.conf:/etc/nginx/nginx.conf:ro   # internal HTTP config (deploy.sh)
       - ./ui:/usr/share/nginx/html:ro
     depends_on:
       - rendering-api

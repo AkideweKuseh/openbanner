@@ -1,50 +1,60 @@
 # Deploying OpenBanner
 
-One script does the whole setup: renders the nginx config + TLS hostnames from your domain,
-builds, launches, and waits for the API to be ready.
+One script does the whole setup: runs the app in Docker on `127.0.0.1:8080`, points your
+**host nginx** at it, and gets a TLS cert via the host's **certbot** (`certbot --nginx`,
+which also auto-renews).
 
 This stack hosts the **designer UI + render API + MinIO**, all on **one host** (UI at `/`,
 API at `/v1/*`, same origin → no CORS). n8n is **not** included — run it wherever you like
 and have it call `https://<domain>/v1/...` with your `X-API-Key`.
 
+```
+Internet ──443──▶ HOST nginx (TLS, certbot --nginx, auto-renew)
+                      │ proxy_pass
+                      ▼
+              127.0.0.1:8080  ──▶ Docker nginx (HTTP) ──▶ UI /  +  API /v1/*  +  MinIO
+```
+
 ## Prerequisites on the VPS
 - Docker + Docker Compose v2 (`docker compose`), `openssl`
-- DNS: one A/AAAA record pointing `<domain>` at the server.
-- TLS cert (recommended): a cert for `<domain>` at `certs/fullchain.pem` and
-  `certs/privkey.pem` (e.g. from certbot). For a quick test without a real cert, pass
-  `--self-signed`.
+- **Host nginx + certbot** already installed (with the nginx plugin: `python3-certbot-nginx`).
+- DNS: one A/AAAA record pointing `<domain>` at the server **before** you run the script
+  (Let's Encrypt validates over port 80).
+- Ports 80 and 443 open to the host nginx.
 
 ## Steps
 
 ```bash
-git clone <repo> && cd open-banner-stack
+git clone https://github.com/AkideweKuseh/openbanner.git && cd openbanner
 
 cp .env.example .env
-nano .env                 # set DOMAIN, API_SECRET_TOKEN, and the secrets
+nano .env                 # set DOMAIN, LETSENCRYPT_EMAIL, MINIO_ROOT_USER
 
 chmod +x deploy.sh        # first run only
-./deploy.sh               # or: ./deploy.sh --gen-secrets --self-signed
+./deploy.sh --gen-secrets # add --le-staging to test TLS without hitting rate limits
 ```
 
 (If the exec bit didn't survive cloning, `bash deploy.sh` works too.)
 
-That's it. The script prints the URLs and your API key at the end.
+The script prints the URLs and your API key at the end.
 
 ### Flags
 - `--gen-secrets` — auto-fill any blank/`__CHANGE_ME__` secret (API token, MinIO
   passwords) with `openssl rand`, writing them back into `.env`.
-- `--self-signed` — generate a throwaway self-signed cert for the subdomains so the
-  stack boots without real certs (browsers will warn; replace before going live).
+- `--le-staging` — use Let's Encrypt **staging** (for testing; avoids the prod rate limit).
+- `--no-tls` — skip the host-nginx + certbot step (the app stays on `127.0.0.1:8080` and
+  you wire up your own proxy/cert).
 
 ## What you must set in `.env`
 | Key | What |
 |-----|------|
-| `DOMAIN` | your base domain (subdomains are derived) |
-| `API_SECRET_TOKEN` | the `X-API-Key` clients / your n8n instance send |
-| `MINIO_ROOT_USER/PASSWORD`, `MINIO_APP_USER/PASSWORD`, `MINIO_BUCKET_NAME` | object storage |
+| `DOMAIN` | the host, e.g. `banner.smartinnovationsgh.com` (no scheme, no trailing slash) |
+| `LETSENCRYPT_EMAIL` | your email (Let's Encrypt expiry notices) |
+| `MINIO_ROOT_USER` | a MinIO admin name (e.g. `obadmin`) — not auto-generated |
+| `API_SECRET_TOKEN`, `MINIO_ROOT_PASSWORD`, `MINIO_APP_PASSWORD` | secrets (or use `--gen-secrets`) |
 
-Leave `CORS_ALLOWED_ORIGINS` **unset** (nginx adds CORS in prod), keep `MINIO_ENDPOINT=minio`
-and `BODY_LIMIT=12mb`.
+Leave `CORS_ALLOWED_ORIGINS` **unset** (same origin), and keep `MINIO_ENDPOINT=minio`,
+`BODY_LIMIT=12mb`, `TRUST_PROXY=2`.
 
 ## After deploy
 1. Open `https://<domain>`, sign in, open **API Settings** (gear) and set the API URL to
@@ -60,16 +70,21 @@ Body (JSON): {"format":"png","mergeVars":{"headline":"Hello"}}
 ```
 The response is the rendered image. (`/v1/render` accepts a full inline design too.)
 
+## TLS & renewal
+`certbot --nginx` installs the cert into your **host** nginx and registers a renewal timer
+(`systemctl list-timers | grep certbot`), so renewal is automatic — nothing to schedule.
+The host nginx site config lives at `/etc/nginx/conf.d/openbanner-<domain>.conf`; to change
+the proxy settings, edit it (or delete it and re-run `./deploy.sh`).
+
 ## Updating
 ```bash
 git pull && ./deploy.sh
 ```
-Re-running is safe and idempotent. If you recreate only `rendering-api`, also run
-`docker compose exec nginx nginx -s reload` so nginx re-resolves the upstream.
+Re-running is safe and idempotent. If you recreate only the Docker `nginx` container, run
+`docker compose exec nginx nginx -s reload` so it re-resolves the `rendering-api` upstream.
 
 ## Notes
-- `nginx/nginx.generated.conf` is produced by the script from `nginx/nginx.conf.template`
-  and is git-ignored — edit the **template**, not the generated file.
+- `nginx/nginx.generated.conf` is the internal (HTTP) Docker config, produced from
+  `nginx/nginx.conf.template` and git-ignored — edit the **template**, not the generated file.
 - Templates persist in the `templates-data` volume; uploaded images in `minio-data`.
-- Real TLS via certbot (example): `certbot certonly --standalone -d <domain>`, then
-  copy/symlink the fullchain + privkey into `certs/` and re-run `./deploy.sh`.
+- The Docker stack publishes **only** `127.0.0.1:8080` — it's never directly internet-facing.

@@ -25,6 +25,9 @@ function bool(name, def) {
 export const config = {
   port: int('PORT', 3000),
   apiToken: required('API_SECRET_TOKEN'),
+  // Number of reverse-proxy hops in front of the app (for correct client IP / rate
+  // limiting). Dev = 1 (one nginx). Prod behind host nginx + Docker nginx = 2.
+  trustProxy: int('TRUST_PROXY', 1),
   allowedImageHosts: (process.env.ALLOWED_IMAGE_HOSTS || '')
     .split(',').map((s) => s.trim()).filter(Boolean),
   renderConcurrency: int('RENDER_CONCURRENCY', 3),

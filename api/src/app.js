@@ -14,7 +14,7 @@ import { healthRouter } from './routes/health.js';
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', 1); // behind nginx
+  app.set('trust proxy', config.trustProxy); // behind nginx (host + docker = 2 in prod)
 
   app.use(pinoHttp({ logger }));
   app.use(helmet());
