@@ -1,5 +1,7 @@
 import dns from 'node:dns/promises';
 import net from 'node:net';
+import http from 'node:http';
+import https from 'node:https';
 import { config } from './config.js';
 import { httpError } from './util.js';
 import { refToKey, getImage } from './storage.js';
@@ -84,22 +86,45 @@ export async function fetchImageAsDataUri(src) {
     if (isPrivateIp(a.address)) throw httpError(400, 'image host resolves to a private address');
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.imageFetchTimeoutMs);
-  let resp;
-  try {
-    resp = await fetch(url, { signal: controller.signal, redirect: 'error' });
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!resp.ok) throw httpError(400, `image fetch failed: ${resp.status}`);
-  const ct = resp.headers.get('content-type') || '';
-  if (!ct.startsWith('image/')) throw httpError(400, 'image src is not an image');
+  // Pin the connection to an address we just validated. Without this, fetch() would do
+  // its OWN DNS resolution, which a malicious authorized host could rebind to a private
+  // IP in the window between our check and the connect (DNS-rebinding SSRF / TOCTOU).
+  const pinned = addrs[0];
+  const { buffer, contentType } = await httpGetPinned(url, pinned.address, pinned.family);
+  return `data:${contentType};base64,${buffer.toString('base64')}`;
+}
 
-  const declared = Number(resp.headers.get('content-length') || 0);
-  if (declared && declared > config.maxImageBytes) throw httpError(400, 'image too large');
-  const buf = Buffer.from(await resp.arrayBuffer());
-  if (buf.byteLength > config.maxImageBytes) throw httpError(400, 'image too large');
+// Fetch over node:http(s) with the resolved IP pinned (custom `lookup`) and the body
+// streamed under a hard size cap. Redirects are refused so they can't bounce to an
+// unvalidated/internal target.
+function httpGetPinned(url, ip, family) {
+  const mod = url.protocol === 'https:' ? https : http;
+  return new Promise((resolve, reject) => {
+    const req = mod.request(url, {
+      method: 'GET',
+      timeout: config.imageFetchTimeoutMs,
+      lookup: (_host, opts, cb) => (opts && opts.all ? cb(null, [{ address: ip, family }]) : cb(null, ip, family)),
+    }, (res) => {
+      const status = res.statusCode || 0;
+      if (status >= 300 && status < 400) { res.destroy(); return reject(httpError(400, 'image fetch failed: redirects not allowed')); }
+      if (status !== 200) { res.destroy(); return reject(httpError(400, `image fetch failed: ${status}`)); }
+      const ct = res.headers['content-type'] || '';
+      if (!ct.startsWith('image/')) { res.destroy(); return reject(httpError(400, 'image src is not an image')); }
+      const declared = Number(res.headers['content-length'] || 0);
+      if (declared && declared > config.maxImageBytes) { res.destroy(); return reject(httpError(400, 'image too large')); }
 
-  return `data:${ct};base64,${buf.toString('base64')}`;
+      const chunks = [];
+      let total = 0;
+      res.on('data', (c) => {
+        total += c.length;
+        if (total > config.maxImageBytes) { res.destroy(); reject(httpError(400, 'image too large')); return; }
+        chunks.push(c);
+      });
+      res.on('end', () => resolve({ buffer: Buffer.concat(chunks), contentType: ct.split(';')[0].trim() }));
+      res.on('error', reject);
+    });
+    req.on('timeout', () => req.destroy(httpError(504, 'image fetch timed out')));
+    req.on('error', reject);
+    req.end();
+  });
 }
