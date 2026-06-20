@@ -43,8 +43,11 @@ ok "docker + compose present"
 # ── 1. .env ──────────────────────────────────────────────────────────────────
 if [ ! -f .env ]; then
   cp .env.example .env
+  chmod 600 .env 2>/dev/null || true
   die ".env created from .env.example — fill in DOMAIN, API_SECRET_TOKEN and the secrets, then re-run."
 fi
+# .env holds secrets — keep it owner-only readable.
+chmod 600 .env 2>/dev/null || true
 
 # helper: set/replace KEY=value in .env (| delimiter is safe for base64 values)
 set_env() {
@@ -96,10 +99,11 @@ if [ -f certs/fullchain.pem ] && [ -f certs/privkey.pem ]; then
   ok "TLS certs present in ./certs"
 elif $SELF_SIGNED; then
   log "Generating self-signed TLS cert (testing only)"
-  openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+  ( umask 077; openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
     -keyout certs/privkey.pem -out certs/fullchain.pem \
     -subj "/CN=${DOMAIN}" \
-    -addext "subjectAltName=DNS:${DOMAIN}" >/dev/null 2>&1
+    -addext "subjectAltName=DNS:${DOMAIN}" >/dev/null 2>&1 )
+  chmod 600 certs/privkey.pem 2>/dev/null || true
   warn "Self-signed cert created — browsers will warn. Replace certs/{fullchain,privkey}.pem with real certs (e.g. certbot) for production."
 else
   die "No TLS certs in ./certs (need fullchain.pem + privkey.pem). Use real certs (certbot/Let's Encrypt for ${DOMAIN}) or re-run with --self-signed for testing."
@@ -125,6 +129,10 @@ done
 $ready && ok "render API is ready" || warn "render API not ready yet — check: ${COMPOSE[*]} logs rendering-api"
 
 # ── 8. summary ───────────────────────────────────────────────────────────────
+# Only reveal the API key on an interactive terminal so it can't leak into captured
+# or redirected logs (CI, ./deploy.sh > deploy.log, etc.).
+if [ -t 1 ]; then api_key_display="$API_SECRET_TOKEN"
+else api_key_display="(hidden — run: grep ^API_SECRET_TOKEN= .env)"; fi
 cat <<EOF
 
 $c_green──────────────────────────────────────────────────────────────$c_reset
@@ -133,7 +141,7 @@ $c_green OpenBanner is deployed$c_reset
   App + API     https://$DOMAIN        (open this; use the same URL as the API URL in the gear modal)
   Health        https://$DOMAIN/readyz
 
-  API key (X-API-Key):  $API_SECRET_TOKEN
+  API key (X-API-Key):  $api_key_display
 
   Call from any n8n instance (server-to-server, no CORS):
     POST https://$DOMAIN/v1/templates/<id>/render
