@@ -1,9 +1,13 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # SOURCE TEMPLATE — do not edit the generated file (nginx/nginx.generated.conf).
 # deploy.sh renders this by replacing __DOMAIN__ with $DOMAIN from .env.
-# Subdomains used: app.__DOMAIN__ (UI), api.__DOMAIN__ (render API),
-# minio.__DOMAIN__ (MinIO console). n8n is NOT hosted here — a separate n8n instance
-# calls https://api.__DOMAIN__ server-to-server with X-API-Key.
+#
+# Single-host topology: everything is served from one origin (__DOMAIN__).
+#   /            -> designer UI (static)
+#   /v1/*        -> render API (same origin => no CORS)
+#   /healthz,/readyz -> API health
+# n8n runs elsewhere and calls https://__DOMAIN__/v1/... with X-API-Key.
+# MinIO runs internally for image storage; its console is NOT exposed publicly.
 # ─────────────────────────────────────────────────────────────────────────────
 user nginx;
 worker_processes auto;
@@ -15,11 +19,9 @@ http {
     sendfile      on;
     server_tokens off;
 
-    map $http_upgrade $connection_upgrade { default upgrade; '' close; }
     limit_req_zone $binary_remote_addr zone=renderlimit:10m rate=10r/s;
 
-    upstream render_api    { server rendering-api:3000; }
-    upstream minio_console { server minio:9001; }
+    upstream render_api { server rendering-api:3000; }
 
     # ---- HTTP -> HTTPS ----
     server {
@@ -28,11 +30,11 @@ http {
         return 301 https://$host$request_uri;
     }
 
-    # ---- OpenBanner UI: app.__DOMAIN__ ----
+    # ---- OpenBanner (UI + API on one origin): __DOMAIN__ ----
     server {
         listen 443 ssl;
         http2 on;
-        server_name app.__DOMAIN__;
+        server_name __DOMAIN__;
 
         ssl_certificate     /etc/nginx/certs/fullchain.pem;
         ssl_certificate_key /etc/nginx/certs/privkey.pem;
@@ -42,94 +44,35 @@ http {
         root /usr/share/nginx/html;
         index index.html;
 
-        # Cache static assets
+        # Must be >= the API's BODY_LIMIT so uploaded images (base64 data: URIs up to
+        # ≈1.34× MAX_IMAGE_BYTES) reach the app, which enforces the precise limit.
+        client_max_body_size 13m;
+
+        location /metrics { return 404; }   # never expose metrics publicly
+
+        # Render API — same origin as the UI, so no CORS is involved at all.
+        location /v1/ {
+            limit_req zone=renderlimit burst=20 nodelay;
+            proxy_pass http://render_api;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Health endpoints (served by the API at the root path).
+        location = /healthz { proxy_pass http://render_api; proxy_set_header Host $host; }
+        location = /readyz  { proxy_pass http://render_api; proxy_set_header Host $host; }
+
+        # Cache static UI assets.
         location ~* \.(css|js|svg|png|ico|woff2?)$ {
             expires 7d;
             add_header Cache-Control "public, immutable";
         }
 
-        # SPA fallback
+        # SPA fallback for the designer UI.
         location / {
             try_files $uri $uri/ /index.html;
-        }
-    }
-
-    # ---- Render API: api.__DOMAIN__ ----
-    server {
-        listen 443 ssl;
-        http2 on;
-        server_name api.__DOMAIN__;
-
-        ssl_certificate     /etc/nginx/certs/fullchain.pem;
-        ssl_certificate_key /etc/nginx/certs/privkey.pem;
-        ssl_protocols       TLSv1.2 TLSv1.3;
-        add_header Strict-Transport-Security "max-age=31536000" always;
-
-        # Must be >= the API's BODY_LIMIT so uploaded images (inline base64 data: URIs,
-        # up to ≈1.34× MAX_IMAGE_BYTES) reach the app, which enforces the precise limit
-        # and returns a clean JSON 413. Kept slightly above BODY_LIMIT for that reason.
-        client_max_body_size 13m;
-
-        # CORS for the UI. Added on every response (incl. proxied OPTIONS preflight, which
-        # the API answers 204) so cross-subdomain browser calls succeed. Leave the API's
-        # CORS_ALLOWED_ORIGINS UNSET in prod, or you'll emit a duplicate ACAO header.
-        add_header Access-Control-Allow-Origin "https://app.__DOMAIN__" always;
-        add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;
-        add_header Access-Control-Allow-Headers "Content-Type, X-API-Key" always;
-
-        location /metrics { return 404; }   # never expose metrics publicly
-
-        # Preflight requests
-        location = /v1/render {
-            if ($request_method = OPTIONS) {
-                add_header Access-Control-Allow-Origin "https://app.__DOMAIN__";
-                add_header Access-Control-Allow-Methods "GET, POST, OPTIONS";
-                add_header Access-Control-Allow-Headers "Content-Type, X-API-Key";
-                add_header Access-Control-Max-Age 86400;
-                add_header Content-Length 0;
-                add_header Content-Type text/plain;
-                return 204;
-            }
-
-            limit_req zone=renderlimit burst=20 nodelay;
-            proxy_pass http://render_api;
-            proxy_set_header Host              $host;
-            proxy_set_header X-Real-IP         $remote_addr;
-            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-
-        location / {
-            limit_req zone=renderlimit burst=20 nodelay;
-            proxy_pass http://render_api;
-            proxy_set_header Host              $host;
-            proxy_set_header X-Real-IP         $remote_addr;
-            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-    }
-
-    # ---- MinIO console: minio.__DOMAIN__ (optional) ----
-    server {
-        listen 443 ssl;
-        http2 on;
-        server_name minio.__DOMAIN__;
-
-        ssl_certificate     /etc/nginx/certs/fullchain.pem;
-        ssl_certificate_key /etc/nginx/certs/privkey.pem;
-        ssl_protocols       TLSv1.2 TLSv1.3;
-
-        client_max_body_size 0;
-
-        location / {
-            proxy_pass http://minio_console;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade           $http_upgrade;
-            proxy_set_header Connection        $connection_upgrade;
-            proxy_set_header Host              $host;
-            proxy_set_header X-Real-IP         $remote_addr;
-            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
         }
     }
 }

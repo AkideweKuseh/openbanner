@@ -3,16 +3,16 @@
 One script does the whole setup: renders the nginx config + TLS hostnames from your domain,
 builds, launches, and waits for the API to be ready.
 
-This stack hosts the **designer UI + render API + MinIO**. n8n is **not** included — run it
-wherever you like and have it call `https://api.<domain>` with your `X-API-Key`.
+This stack hosts the **designer UI + render API + MinIO**, all on **one host** (UI at `/`,
+API at `/v1/*`, same origin → no CORS). n8n is **not** included — run it wherever you like
+and have it call `https://<domain>/v1/...` with your `X-API-Key`.
 
 ## Prerequisites on the VPS
 - Docker + Docker Compose v2 (`docker compose`), `openssl`
-- DNS: point these A/AAAA records at the server —
-  `app.<domain>`, `api.<domain>`, `minio.<domain>`
-- TLS certs (recommended): a wildcard or SAN cert for the subdomains at
-  `certs/fullchain.pem` and `certs/privkey.pem` (e.g. from certbot). For a quick test
-  without real certs, pass `--self-signed`.
+- DNS: one A/AAAA record pointing `<domain>` at the server.
+- TLS cert (recommended): a cert for `<domain>` at `certs/fullchain.pem` and
+  `certs/privkey.pem` (e.g. from certbot). For a quick test without a real cert, pass
+  `--self-signed`.
 
 ## Steps
 
@@ -47,14 +47,14 @@ Leave `CORS_ALLOWED_ORIGINS` **unset** (nginx adds CORS in prod), keep `MINIO_EN
 and `BODY_LIMIT=12mb`.
 
 ## After deploy
-1. Open `https://app.<domain>`, sign in, open **API Settings** (gear) and set the API URL to
-   `https://api.<domain>` and the API key to your `API_SECRET_TOKEN`.
+1. Open `https://<domain>`, sign in, open **API Settings** (gear) and set the API URL to
+   `https://<domain>` (same host) and the API key to your `API_SECRET_TOKEN`.
 2. Design a template, upload an image (stored in MinIO), publish, render.
 
 ## Calling the API from n8n (separate instance)
 Use an **HTTP Request** node — it's a server-to-server call, no CORS:
 ```
-POST https://api.<domain>/v1/templates/<template-id>/render
+POST https://<domain>/v1/templates/<template-id>/render
 Header: X-API-Key: <your API_SECRET_TOKEN>
 Body (JSON): {"format":"png","mergeVars":{"headline":"Hello"}}
 ```
@@ -71,5 +71,5 @@ Re-running is safe and idempotent. If you recreate only `rendering-api`, also ru
 - `nginx/nginx.generated.conf` is produced by the script from `nginx/nginx.conf.template`
   and is git-ignored — edit the **template**, not the generated file.
 - Templates persist in the `templates-data` volume; uploaded images in `minio-data`.
-- Real TLS via certbot (example): obtain a cert for the subdomains, then copy/symlink the
-  fullchain + privkey into `certs/` and re-run `./deploy.sh`.
+- Real TLS via certbot (example): `certbot certonly --standalone -d <domain>`, then
+  copy/symlink the fullchain + privkey into `certs/` and re-run `./deploy.sh`.
