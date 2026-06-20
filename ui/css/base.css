@@ -333,17 +333,26 @@ ul, ol { list-style: none; }
 
 .form-input {
   padding: var(--ob-space-2) var(--ob-space-3);
-  background: var(--ob-bg-base);
+  background: var(--ob-bg-elevated);
   border: 1px solid var(--ob-border-default);
   border-radius: var(--ob-radius-md);
   color: var(--ob-text-primary);
   font-size: var(--ob-text-sm);
-  transition: all var(--ob-duration-fast) var(--ob-ease-default);
+  font-variant-numeric: tabular-nums;
+  transition: border-color var(--ob-duration-fast) var(--ob-ease-default),
+              box-shadow var(--ob-duration-fast) var(--ob-ease-default),
+              background-color var(--ob-duration-fast) var(--ob-ease-default);
+}
+
+.form-input:hover:not(:focus) {
+  border-color: var(--ob-border-strong);
+  background: var(--ob-bg-base);
 }
 
 .form-input:focus {
   border-color: var(--ob-accent-lime);
-  box-shadow: 0 0 0 2px rgba(204, 255, 0, 0.3);
+  background: var(--ob-bg-base);
+  box-shadow: 0 0 0 3px rgba(204, 255, 0, 0.25);
 }
 
 .form-input::placeholder {
@@ -351,8 +360,9 @@ ul, ol { list-style: none; }
 }
 
 .form-input--sm {
-  padding: var(--ob-space-1) var(--ob-space-2);
+  padding: 6px var(--ob-space-2);
   font-size: var(--ob-text-xs);
+  border-radius: var(--ob-radius-sm);
 }
 
 select.form-input {
@@ -380,13 +390,32 @@ input[type="range"] {
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--ob-text-primary);
-  box-shadow: 0 0 4px rgba(0,0,0,0.2);
+  border: 2px solid var(--ob-bg-base);
+  box-shadow: var(--ob-shadow-sm);
+  cursor: grab;
+  transition: transform var(--ob-duration-fast) var(--ob-ease-spring),
+              box-shadow var(--ob-duration-fast) var(--ob-ease-default);
+}
+input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.12); }
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(0.94);
+  cursor: grabbing;
+  box-shadow: 0 0 0 4px rgba(204, 255, 0, 0.25);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ob-text-primary);
+  border: 2px solid var(--ob-bg-base);
+  box-shadow: var(--ob-shadow-sm);
   cursor: grab;
 }
+input[type="range"]:active::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(204, 255, 0, 0.25); }
 
 /* ── Badges ── */
 .badge {

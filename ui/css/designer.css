@@ -434,23 +434,48 @@
 }
 
 .inspector__section {
-  padding: var(--ob-space-4);
+  padding: var(--ob-space-5) var(--ob-space-4);
   border-bottom: 1px solid var(--ob-border-subtle);
+  /* Consistent vertical rhythm: one gap governs spacing between the title, fields,
+     grids, and helper text — replaces the ad-hoc per-field margins. */
+  display: flex;
+  flex-direction: column;
+  gap: var(--ob-space-3);
 }
 
 .inspector__section-title {
-  font-size: var(--ob-text-xs);
+  font-size: 0.625rem; /* 10px — a quiet eyebrow, not a competing headline */
   font-weight: var(--ob-weight-semi);
-  color: var(--ob-text-secondary);
+  color: var(--ob-text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: var(--ob-space-3);
+  letter-spacing: 0.1em;
+  margin-bottom: 0;
+}
+
+/* Field labels read as quiet captions so the values dominate (was double all-caps). */
+.designer__inspector .form-label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--ob-text-xs);
+  font-weight: var(--ob-weight-medium);
+  color: var(--ob-text-tertiary);
+}
+
+.designer__inspector .form-group {
+  gap: var(--ob-space-2);
+}
+
+/* Coordinate / size fields: tabular monospace so digits stay aligned while typing. */
+.designer__inspector input[type="number"].form-input {
+  font-family: var(--ob-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .inspector-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--ob-space-2);
+  gap: var(--ob-space-3);
 }
 
 .inspector-grid--full {

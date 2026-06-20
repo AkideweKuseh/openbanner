@@ -130,7 +130,7 @@ function renderTextInspector(el) {
     </div>
     <div class="inspector__section">
       <div class="inspector__section-title">Typography</div>
-      <div class="form-group" style="margin-bottom:var(--ob-space-2);">
+      <div class="form-group">
         <label class="form-label">Font Family</label>
         <select class="form-input form-input--sm" id="prop-fontFamily">
           <option value="Inter" ${(!el.fontFamily || el.fontFamily === 'Inter') ? 'selected' : ''}>Inter</option>
@@ -143,7 +143,7 @@ function renderTextInspector(el) {
           <option value="JetBrains Mono" ${el.fontFamily === 'JetBrains Mono' ? 'selected' : ''}>JetBrains Mono</option>
         </select>
       </div>
-      <div class="form-group" style="margin-bottom:var(--ob-space-2);">
+      <div class="form-group">
         <label class="form-label">Font Size: <span id="font-size-val">${el.fontSize}</span>px</label>
         <input type="range" min="8" max="400" value="${el.fontSize}" id="prop-fontSize">
       </div>
@@ -162,7 +162,7 @@ function renderTextInspector(el) {
           <input type="number" class="form-input form-input--sm" id="prop-maxWidth" value="${el.maxWidth || ''}" placeholder="auto">
         </div>
       </div>
-      <div class="form-group" style="margin-top:var(--ob-space-2);">
+      <div class="form-group">
         <label class="form-label">Alignment</label>
         <select class="form-input form-input--sm" id="prop-align">
           <option value="left" ${(!el.align || el.align === 'left') ? 'selected' : ''}>Left (grow right)</option>
@@ -174,7 +174,7 @@ function renderTextInspector(el) {
     </div>
     <div class="inspector__section">
       <div class="inspector__section-title">Appearance</div>
-      <div class="form-group" style="margin-bottom:var(--ob-space-2);">
+      <div class="form-group">
         <label class="form-label">Effect</label>
         <select class="form-input form-input--sm" id="prop-effect">
           <option value="none" ${el.effect === 'none' ? 'selected' : ''}>None (solid color)</option>
@@ -269,7 +269,7 @@ function renderRectInspector(el) {
     </div>
     <div class="inspector__section">
       <div class="inspector__section-title">Appearance</div>
-      <div class="form-group" style="margin-bottom:var(--ob-space-2);">
+      <div class="form-group">
         <label class="form-label">Color</label>
         <div style="display:flex;gap:var(--ob-space-2);align-items:center;">
           <input type="color" class="form-input" id="prop-color" value="${el.color.startsWith('rgba') ? '#000000' : el.color}" style="width:40px;">
