@@ -1,18 +1,59 @@
+<div align="center">
+
 # OpenBanner
 
-Self-hosted templated image generation: design a template in the browser, name text **slots**,
-publish it, then render variations by ID via a simple HTTP API (inject text + format, get a
-PNG/JPEG/WebP back). Uploaded images are stored in object storage; rendering is done by
-headless Chromium.
+Self-hosted, API-driven banner/image generation.
 
-**Repository / author:** https://github.com/AkideweKuseh
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Docker](https://img.shields.io/badge/docker-compose-2496ED?logo=docker&logoColor=white)](./docker-compose.yml)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-```
+</div>
+
+Design a template in the browser, name its text **slots**, publish it, then render variations
+by ID via a simple HTTP API — inject text + format, get a PNG/JPEG/WebP back. Uploaded images
+are stored in object storage; rendering is done by a hardened, headless Chromium.
+
+```text
 Designer UI (vanilla JS)  ──┐
                             ├──► nginx ──► Render API (Express + Puppeteer/Chromium)
 External n8n / scripts  ────┘                    │
    POST /v1/.../render  (X-API-Key)              └──► MinIO (uploaded source images)
 ```
+
+---
+
+## Why OpenBanner?
+
+- **Self-hosted.** Your images, your templates, and your API key never leave your server. No
+  third-party rendering SaaS in the loop.
+- **Template + slots, not "prompt an image."** You lay out real elements (text, rectangles,
+  images) on a canvas and expose named text **slots**. Rendering is deterministic — inject
+  `{ "headline": "Hello" }`, get exactly the banner you designed, every time.
+- **Render by ID over HTTP.** Publish once, then call `POST /v1/templates/:id/render` from
+  n8n, a cron job, a script, or your app. One shared-secret API key, no CORS in production.
+- **Hardened by default.** API-key auth on every route, no CORS, remote image fetching off,
+  SSRF-guarded when on, and a locked-down Chromium (JS disabled, all network requests aborted).
+- **One-command deploy.** A single `deploy.sh` provisions TLS (Let's Encrypt) and brings up
+  the whole stack.
+
+## Screenshots
+
+<!-- Drop your screenshots into docs/img/ and replace the placeholders below. Recommended:
+     a designer-canvas shot and a rendered output example. -->
+
+<!--
+<p align="center">
+  <img src="docs/img/designer.png" alt="OpenBanner designer canvas" width="720">
+</p>
+<p align="center">
+  <img src="docs/img/output.png" alt="Rendered banner output" width="360">
+</p>
+-->
+
+> _Screenshots coming soon._ See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for how it
+> works in the meantime.
 
 ---
 
@@ -33,7 +74,6 @@ n8n is **not** part of this stack — any external n8n instance calls the API se
 Requires Docker + Docker Compose.
 
 ```bash
-cd open-banner-stack
 cp .env.example .env          # the dev defaults work as-is for localhost
 docker compose -f docker-compose.dev.yml up -d --build
 # open http://localhost:8080
@@ -48,11 +88,14 @@ set the API URL to `http://localhost:8080` and the API key to `API_SECRET_TOKEN`
 > If you recreate only the API container, reload nginx so it re-resolves the upstream:
 > `docker exec ob-dev-nginx nginx -s reload`
 
+For running the API bare, tests, and Chromium debugging tips, see
+[`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md).
+
 ---
 
 ## Project structure
 
-```
+```text
 api/
   src/
     app.js            Express app: middleware, routes, error handling
@@ -80,6 +123,7 @@ docker-compose.dev.yml   local dev (UI+API+MinIO, same origin)
 docker-compose.yml       production (nginx TLS + API + MinIO)
 deploy.sh                one-command production deploy
 DEPLOY.md                deployment guide
+docs/                    ARCHITECTURE.md · DEVELOPMENT.md
 ```
 
 ---
@@ -154,4 +198,31 @@ builds, launches (`app.`/`api.`/`minio.<domain>`), and waits for the API to be r
 
 ---
 
-Made by [@AkideweKuseh](https://github.com/AkideweKuseh).
+## Documentation
+
+- **[Architecture](./docs/ARCHITECTURE.md)** — topology, request lifecycle, render pipeline,
+  browser pool, SSRF guarding, security model.
+- **[Development](./docs/DEVELOPMENT.md)** — local dev with/without Docker, tests, debugging.
+- **[Deployment](./DEPLOY.md)** — production setup, TLS, updates.
+- **[Security policy](./SECURITY.md)** — supported versions, security model, reporting.
+
+## Contributing
+
+Contributions are welcome! Please read **[CONTRIBUTING.md](./CONTRIBUTING.md)** for the dev
+setup, branching/commit conventions, and the PR process. By contributing, you agree your
+contributions are licensed under the MIT License. This project follows the
+[Contributor Covenant Code of Conduct](./CODE_OF_CONDUCT.md).
+
+See the [changelog](./CHANGELOG.md) for release history.
+
+## License
+
+Released under the **MIT License** — see [LICENSE](./LICENSE).
+
+```
+Copyright (c) 2026 Akidewe Kuseh
+```
+
+---
+
+Made by [@AkideweKuseh](https://github.com/AkideweKuseh) · 🇬🇭 Ghana

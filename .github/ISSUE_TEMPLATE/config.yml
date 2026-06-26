@@ -1,0 +1,9 @@
+# https://docs.github.com/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Ask a question / get help
+    url: https://github.com/AkideweKuseh/openbanner/discussions
+    about: Usage questions and ideas belong in Discussions, not in Issues.
+  - name: 🔒 Report a security vulnerability
+    url: https://github.com/AkideweKuseh/openbanner/security/advisories/new
+    about: Found a security issue? Please report it privately instead of opening an issue.

@@ -2,6 +2,17 @@
   "name": "open-banner-api",
   "version": "1.0.0",
   "private": true,
+  "description": "Self-hosted templated image generation API (design templates in the browser, render variations via HTTP).",
+  "license": "MIT",
+  "author": "Akidewe Kuseh (https://github.com/AkideweKuseh)",
+  "homepage": "https://github.com/AkideweKuseh/openbanner",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AkideweKuseh/openbanner.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AkideweKuseh/openbanner/issues"
+  },
   "type": "module",
   "engines": { "node": ">=22" },
   "scripts": {
