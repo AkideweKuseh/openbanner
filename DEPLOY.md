@@ -76,12 +76,18 @@ The response is the rendered image. (`/v1/render` accepts a full inline design t
 The host nginx site config lives at `/etc/nginx/conf.d/openbanner-<domain>.conf`; to change
 the proxy settings, edit it (or delete it and re-run `./deploy.sh`).
 
-## Updating
+## Updating (already deployed)
+For everyday updates use the dedicated script — it skips the one-time setup (no certbot,
+no secret-gen, no host-nginx rewrite) and reloads the internal nginx so it re-resolves the
+recreated `rendering-api` upstream (which otherwise returns 502 after every API rebuild):
 ```bash
-git pull && ./deploy.sh
+./redeploy.sh          # git pull → build → up → reload nginx → wait
+./redeploy.sh --no-pull  # deploy the current checkout as-is
 ```
-Re-running is safe and idempotent. If you recreate only the Docker `nginx` container, run
-`docker compose exec nginx nginx -s reload` so it re-resolves the `rendering-api` upstream.
+
+`./deploy.sh` still works and is idempotent, but it re-runs the certbot/TLS step each time,
+so prefer `./redeploy.sh` for routine updates. Use `./deploy.sh` only for first-time
+install or when you actually need to re-provision TLS/host-nginx.
 
 ## Notes
 - `nginx/nginx.generated.conf` is the internal (HTTP) Docker config, produced from
