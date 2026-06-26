@@ -40,20 +40,13 @@ External n8n / scripts  ────┘                    │
 
 ## Screenshots
 
-<!-- Drop your screenshots into docs/img/ and replace the placeholders below. Recommended:
-     a designer-canvas shot and a rendered output example. -->
+**Designer** — lay out text, rectangles, and images on a canvas and expose named text slots:
 
-<!--
-<p align="center">
-  <img src="docs/img/designer.png" alt="OpenBanner designer canvas" width="720">
-</p>
-<p align="center">
-  <img src="docs/img/output.png" alt="Rendered banner output" width="360">
-</p>
--->
+![OpenBanner designer UI](docs/img/designer-ui.png)
 
-> _Screenshots coming soon._ See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for how it
-> works in the meantime.
+**Templates** — publish once, then render variations by ID over HTTP:
+
+![Template list](docs/img/templates-list.png)
 
 ---
 
