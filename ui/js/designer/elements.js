@@ -8,9 +8,15 @@ let nextId = 1;
 let elements = [];
 let selectedId = null;
 let listeners = [];
+let selectListeners = [];
 
 function notify() {
   for (const fn of listeners) fn(getAll(), selectedId);
+}
+
+/** Fire only when the selected element actually changes (not on every property edit). */
+function notifySelect() {
+  for (const fn of selectListeners) fn(selectedId);
 }
 
 function snapshot() {
@@ -19,6 +25,11 @@ function snapshot() {
 
 export function onChange(fn) {
   listeners.push(fn);
+}
+
+/** Subscribe to selection changes only (used to rebuild the inspector; safe for focus). */
+export function onSelectChange(fn) {
+  selectListeners.push(fn);
 }
 
 export function getAll() {
@@ -38,13 +49,17 @@ export function getSelectedId() {
 }
 
 export function select(id) {
+  if (selectedId === id) { notify(); return; }
   selectedId = id;
   notify();
+  notifySelect();
 }
 
 export function deselect() {
+  if (selectedId === null) { notify(); return; }
   selectedId = null;
   notify();
+  notifySelect();
 }
 
 /** Create a default text element */
@@ -53,6 +68,7 @@ export function addText(overrides = {}) {
   const el = {
     _id: nextId++,
     type: 'text',
+    name: '',
     text: 'Your Text Here',
     left: 80,
     top: 80 + elements.length * 50,
@@ -62,11 +78,17 @@ export function addText(overrides = {}) {
     fontWeight: 'bold',
     effect: 'none',
     align: 'left',
+    // Optional sized "placeholder" box. Blank = auto-grow (legacy behavior).
+    width: undefined,
+    height: undefined,
+    letterSpacing: undefined,
+    lineHeight: undefined,
     ...overrides,
   };
   elements.push(el);
   selectedId = el._id;
   notify();
+  notifySelect();
   return el;
 }
 
@@ -76,6 +98,7 @@ export function addRect(overrides = {}) {
   const el = {
     _id: nextId++,
     type: 'rect',
+    name: '',
     left: 60,
     top: 60 + elements.length * 30,
     width: 300,
@@ -87,6 +110,7 @@ export function addRect(overrides = {}) {
   elements.push(el);
   selectedId = el._id;
   notify();
+  notifySelect();
   return el;
 }
 
@@ -96,6 +120,7 @@ export function addImage(overrides = {}) {
   const el = {
     _id: nextId++,
     type: 'image',
+    name: '',
     src: overrides.src || 'https://placehold.co/400x300/e2e8f0/475569?text=Double-Click+to+Upload',
     left: 60,
     top: 60 + elements.length * 30,
@@ -107,6 +132,7 @@ export function addImage(overrides = {}) {
   elements.push(el);
   selectedId = el._id;
   notify();
+  notifySelect();
   return el;
 }
 
@@ -149,8 +175,10 @@ export function commitDrag() {
 export function remove(id) {
   snapshot();
   elements = elements.filter(el => el._id !== id);
-  if (selectedId === id) selectedId = null;
+  const wasSelected = selectedId === id;
+  if (wasSelected) selectedId = null;
   notify();
+  if (wasSelected) notifySelect();
 }
 
 /** Duplicate the selected element */
@@ -164,6 +192,7 @@ export function duplicate(id) {
   elements.push(copy);
   selectedId = copy._id;
   notify();
+  notifySelect();
   return copy;
 }
 
@@ -187,6 +216,33 @@ export function moveDown(id) {
   }
 }
 
+/**
+ * Drag-to-reorder. `place` is relative to `targetId` in PANEL order (front-to-back, i.e.
+ * the order the Layers list is displayed): 'before' = drop above the target, 'after' =
+ * drop below it. We do the move in panel order so "up in the list = closer to front"
+ * maps intuitively, then reverse back to the array's back-to-front convention.
+ */
+export function reorder(draggedId, targetId, place) {
+  if (draggedId === targetId) return;
+  const dragged = getById(draggedId);
+  const target = getById(targetId);
+  if (!dragged || !target) return;
+  snapshot();
+  const panel = [...elements].reverse(); // front-to-back
+  const fromP = panel.findIndex(e => e._id === draggedId);
+  if (fromP >= 0) panel.splice(fromP, 1);
+  let insertAt = panel.findIndex(e => e._id === targetId);
+  if (insertAt < 0) {
+    // Target vanished (shouldn't happen) — append to end safely.
+    insertAt = panel.length;
+  } else if (place === 'after') {
+    insertAt += 1;
+  }
+  panel.splice(insertAt, 0, dragged);
+  elements = panel.reverse(); // back to back-to-front
+  notify();
+}
+
 /** Replace all elements (used by undo/redo, import, templates) */
 export function replaceAll(newElements, newSelectedId = null) {
   elements = JSON.parse(JSON.stringify(newElements));
@@ -197,8 +253,10 @@ export function replaceAll(newElements, newSelectedId = null) {
     if (el._id >= maxId) maxId = el._id + 1;
   }
   nextId = Math.max(nextId, maxId);
+  const prevSelected = selectedId;
   selectedId = newSelectedId;
   notify();
+  if (prevSelected !== selectedId) notifySelect();
 }
 
 /** Build the API render payload (strips _id) */

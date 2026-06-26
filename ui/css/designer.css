@@ -188,6 +188,27 @@
   white-space: nowrap;
 }
 
+/* Drag handle affordance + drag-to-reorder states */
+.layer-item__grip {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 12px;
+  color: var(--ob-text-tertiary);
+  opacity: 0;
+  transition: opacity var(--ob-duration-fast);
+  cursor: grab;
+}
+.layer-item:hover .layer-item__grip,
+.layer-item--selected .layer-item__grip { opacity: 1; }
+.layer-item__grip:active { cursor: grabbing; }
+
+.layer-item--dragging { opacity: 0.4; }
+/* Drop indicators: a lime line at the top or bottom edge of the hovered row. These
+   intentionally override the selected inset shadow while a drag is in progress. */
+.layer-item--drop-above { box-shadow: inset 0 2px 0 0 var(--ob-accent-lime); }
+.layer-item--drop-below { box-shadow: inset 0 -2px 0 0 var(--ob-accent-lime); }
+
 .layer-item__actions {
   display: flex;
   gap: 2px;
@@ -354,7 +375,10 @@
 }
 
 .canvas-element--selected {
-  z-index: 100;
+  /* NOTE: do NOT raise z-index here. A selected full-canvas background rect with a
+     positive z-index paints above every sibling and "covers" the whole canvas — which
+     is the exact bug we fixed. The outline + box-shadow make selection clearly visible
+     without disturbing the layer stacking order. */
   outline: 2px solid var(--ob-accent-lime);
   outline-offset: 2px;
   box-shadow: 0 0 0 5px rgba(204, 255, 0, 0.18);
@@ -802,6 +826,12 @@ body.ds-home .home-actions { display: inline-flex; }
 body.ds-home .header-editor-left,
 body.ds-home .header-center,
 body.ds-home .editor-actions { display: none !important; }
+
+/* On the Dashboard tab the editor has no business showing canvas-editor chrome
+   (template name, undo/redo, add tools, zoom, save/publish). Hide the whole top bar so
+   only the slim-nav logo remains — a clean, minimal dashboard header. .main-views is
+   flex:1, so it simply expands into the freed space. */
+body.dashboard-view .top-header { display: none !important; }
 
 /* Editable template name (editor header) */
 .template-name-input {

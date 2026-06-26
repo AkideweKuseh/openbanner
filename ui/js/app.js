@@ -27,6 +27,9 @@ function switchTab(tabName) {
     document.body.classList.remove('ds-home');
   }
 
+  // Dashboard gets a minimal header (CSS hides the editor toolbar under this class).
+  document.body.classList.toggle('dashboard-view', tabName === 'dashboard');
+
   tabs.forEach(t => {
     t.classList.toggle('slim-nav__btn--active', t.dataset.tab === tabName);
   });
@@ -167,8 +170,10 @@ function startApp() {
     }
   });
 
-  // Show API key modal on first visit if not configured
-  if (!api.isConfigured) {
+  // Show API key modal only on a truly fresh install — i.e. the user has never
+  // configured the API. Returning users (even with a cleared key) aren't nagged and can
+  // reopen it via the API Settings button in the slim nav.
+  if (!api.configuredOnce) {
     setTimeout(() => apiKeyModal.classList.add('modal-backdrop--open'), 800);
   }
 }
