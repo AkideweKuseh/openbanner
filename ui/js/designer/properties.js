@@ -7,17 +7,35 @@ import * as Canvas from './canvas.js';
 
 let inspectorContent, inspectorEmpty;
 
+// The element currently rendered in the inspector, plus a spec describing which
+// fields to refresh in place (without rebuilding) when a property changes — this is
+// what keeps focus in the field you're typing in (see syncInspectorFields).
+let currentEl = null;
+let syncSpec = [];
+
 export function init() {
   inspectorContent = document.getElementById('inspector-content');
   inspectorEmpty = document.getElementById('inspector-empty');
 
-  // Listen for element selection changes
-  Elements.onChange((elements, selectedId) => {
+  // Full rebuild ONLY when the selection actually changes — never on every keystroke,
+  // so typing in the Content field never destroys/recreates the input (which was the
+  // root cause of the "greys out after one letter" + "Backspace deletes the box" bugs).
+  Elements.onSelectChange((selectedId) => {
     if (selectedId) {
       const el = Elements.getById(selectedId);
       if (el) showElementProperties(el);
+      else showEmpty();
     } else {
       showEmpty();
+    }
+  });
+
+  // Lightweight in-place refresh on every property change (drag, resize, typing in
+  // another field). Live canvas/layers updates are driven by their own onChange subs.
+  Elements.onChange(() => {
+    if (currentEl) {
+      const fresh = Elements.getById(currentEl._id);
+      if (fresh) syncInspectorFields(fresh);
     }
   });
 
@@ -27,7 +45,23 @@ export function init() {
   };
 }
 
+/** Update field values without rebuilding the DOM. Skips the field currently focused. */
+function syncInspectorFields(el) {
+  currentEl = el;
+  for (const { id, prop, blank } of syncSpec) {
+    const node = document.getElementById(id);
+    if (!node) continue;
+    if (node === document.activeElement) continue; // never disrupt the field in use
+    const v = el[prop];
+    try {
+      node.value = (blank && (v === undefined || v === null)) ? '' : v;
+    } catch { /* some inputs reject non-hex/odd values — ignore */ }
+  }
+}
+
 function showEmpty() {
+  currentEl = null;
+  syncSpec = [];
   inspectorContent.style.display = 'none';
   inspectorEmpty.style.display = 'flex';
 }
@@ -42,6 +76,8 @@ function showElementProperties(el) {
 }
 
 function showCanvasProperties() {
+  currentEl = null;
+  syncSpec = [];
   inspectorEmpty.style.display = 'none';
   inspectorContent.style.display = 'block';
 
@@ -99,10 +135,18 @@ function showCanvasProperties() {
 }
 
 function renderTextInspector(el) {
+  currentEl = el;
   inspectorContent.innerHTML = `
     <div class="inspector__header">
       <span class="inspector__title">Text Element</span>
       <button class="btn btn--ghost btn--sm" title="Delete element" aria-label="Delete element" onclick="document.dispatchEvent(new CustomEvent('ob:delete', {detail:${el._id}}))"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+    </div>
+    <div class="inspector__section">
+      <div class="inspector__section-title">Layer</div>
+      <div class="form-group">
+        <label class="form-label">Layer Name</label>
+        <input type="text" class="form-input form-input--sm" id="prop-name" value="${escapeHTML(el.name || '')}" placeholder="Text">
+      </div>
     </div>
     <div class="inspector__section">
       <div class="inspector__section-title">Content</div>
@@ -143,9 +187,18 @@ function renderTextInspector(el) {
           <option value="JetBrains Mono" ${el.fontFamily === 'JetBrains Mono' ? 'selected' : ''}>JetBrains Mono</option>
         </select>
       </div>
-      <div class="form-group">
-        <label class="form-label">Font Size: <span id="font-size-val">${el.fontSize}</span>px</label>
-        <input type="range" min="8" max="400" value="${el.fontSize}" id="prop-fontSize">
+      <div class="inspector-grid">
+        <div class="form-group">
+          <label class="form-label">Font Size (px)</label>
+          <input type="number" class="form-input form-input--sm" id="prop-fontSize" min="8" max="400" step="1" value="${el.fontSize}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Preset</label>
+          <select class="form-input form-input--sm" id="prop-fontSize-preset">
+            <option value="">—</option>
+            ${[12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 72, 96, 128].map(s => `<option value="${s}" ${el.fontSize === s ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </div>
       </div>
       <div class="inspector-grid">
         <div class="form-group">
@@ -158,19 +211,35 @@ function renderTextInspector(el) {
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Max Width</label>
-          <input type="number" class="form-input form-input--sm" id="prop-maxWidth" value="${el.maxWidth || ''}" placeholder="auto">
+          <label class="form-label">Line Height</label>
+          <input type="number" class="form-input form-input--sm" id="prop-lineHeight" min="0.1" max="10" step="0.05" value="${el.lineHeight != null ? el.lineHeight : ''}" placeholder="auto">
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Alignment</label>
-        <select class="form-input form-input--sm" id="prop-align">
-          <option value="left" ${(!el.align || el.align === 'left') ? 'selected' : ''}>Left (grow right)</option>
-          <option value="center" ${el.align === 'center' ? 'selected' : ''}>Center (on X)</option>
-          <option value="right" ${el.align === 'right' ? 'selected' : ''}>Right (end at X)</option>
-        </select>
-        <div style="font-size:var(--ob-text-xs);color:var(--ob-text-muted);margin-top:4px;">Center/right keep text anchored as its length changes — set X to the anchor point (e.g. canvas center).</div>
+      <div class="inspector-grid">
+        <div class="form-group">
+          <label class="form-label">Letter Spacing (px)</label>
+          <input type="number" class="form-input form-input--sm" id="prop-letterSpacing" min="-50" max="200" step="0.5" value="${el.letterSpacing != null ? el.letterSpacing : ''}" placeholder="auto">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Alignment</label>
+          <select class="form-input form-input--sm" id="prop-align">
+            <option value="left" ${(!el.align || el.align === 'left') ? 'selected' : ''}>Left</option>
+            <option value="center" ${el.align === 'center' ? 'selected' : ''}>Center</option>
+            <option value="right" ${el.align === 'right' ? 'selected' : ''}>Right</option>
+          </select>
+        </div>
       </div>
+      <div class="inspector-grid">
+        <div class="form-group">
+          <label class="form-label">Width (px)</label>
+          <input type="number" class="form-input form-input--sm" id="prop-width" min="1" max="4000" value="${el.width != null ? el.width : ''}" placeholder="auto">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Height (px)</label>
+          <input type="number" class="form-input form-input--sm" id="prop-height" min="1" max="4000" value="${el.height != null ? el.height : ''}" placeholder="auto">
+        </div>
+      </div>
+      <div style="font-size:var(--ob-text-xs);color:var(--ob-text-muted);">Width wraps the text into a box; Height clips it. Leave blank to auto-size. Drag the box on canvas to resize.</div>
     </div>
     <div class="inspector__section">
       <div class="inspector__section-title">Appearance</div>
@@ -185,15 +254,34 @@ function renderTextInspector(el) {
       <div class="form-group" id="color-group" ${el.effect !== 'none' ? 'style="opacity:0.4;pointer-events:none;"' : ''}>
         <label class="form-label">Color</label>
         <div style="display:flex;gap:var(--ob-space-2);align-items:center;">
-          <input type="color" class="form-input" id="prop-color" value="${el.color}" style="width:40px;">
-          <input type="text" class="form-input form-input--sm" id="prop-color-text" value="${el.color}" style="flex:1;font-family:var(--ob-font-mono);font-size:var(--ob-text-xs);">
+          <input type="color" class="form-input" id="prop-color" value="${escapeHTML(el.color)}" style="width:40px;">
+          <input type="text" class="form-input form-input--sm" id="prop-color-text" value="${escapeHTML(el.color)}" style="flex:1;font-family:var(--ob-font-mono);font-size:var(--ob-text-xs;">
         </div>
       </div>
     </div>
   `;
 
+  // Fields to refresh in place on external changes (drag/resize/undo). Color is excluded
+  // (it only changes from this panel; setting type=color to non-hex can throw).
+  syncSpec = [
+    { id: 'prop-name', prop: 'name', blank: true },
+    { id: 'prop-text', prop: 'text' },
+    { id: 'prop-left', prop: 'left' },
+    { id: 'prop-top', prop: 'top' },
+    { id: 'prop-fontSize', prop: 'fontSize' },
+    { id: 'prop-fontFamily', prop: 'fontFamily' },
+    { id: 'prop-fontWeight', prop: 'fontWeight' },
+    { id: 'prop-align', prop: 'align' },
+    { id: 'prop-width', prop: 'width', blank: true },
+    { id: 'prop-height', prop: 'height', blank: true },
+    { id: 'prop-letterSpacing', prop: 'letterSpacing', blank: true },
+    { id: 'prop-lineHeight', prop: 'lineHeight', blank: true },
+  ];
+
   // Bind events
   const id = el._id;
+
+  bindInput('prop-name', (v) => Elements.update(id, { name: v }));
 
   document.getElementById('prop-text').addEventListener('input', (e) => {
     Elements.update(id, { text: e.target.value });
@@ -204,19 +292,29 @@ function renderTextInspector(el) {
   bindInput('prop-left', (v) => Elements.update(id, { left: parseInt(v) }));
   bindInput('prop-top', (v) => Elements.update(id, { top: parseInt(v) }));
 
-  const fontSizeRange = document.getElementById('prop-fontSize');
-  fontSizeRange.addEventListener('input', () => {
-    document.getElementById('font-size-val').textContent = fontSizeRange.value;
-    Elements.update(id, { fontSize: parseInt(fontSizeRange.value) });
+  // Font size: typeable number + preset dropdown (replaces the janky slider).
+  const fontSizeInput = document.getElementById('prop-fontSize');
+  const fontSizePreset = document.getElementById('prop-fontSize-preset');
+  fontSizeInput.addEventListener('input', () => {
+    const v = parseInt(fontSizeInput.value);
+    if (!isNaN(v)) Elements.update(id, { fontSize: Math.max(8, Math.min(400, v)) });
+    if (fontSizePreset !== document.activeElement) fontSizePreset.value = '';
+  });
+  fontSizePreset.addEventListener('change', () => {
+    const v = parseInt(fontSizePreset.value);
+    if (!isNaN(v)) {
+      fontSizeInput.value = v;
+      Elements.update(id, { fontSize: v });
+    }
   });
 
   bindSelect('prop-fontFamily', (v) => Elements.update(id, { fontFamily: v }));
   bindSelect('prop-fontWeight', (v) => Elements.update(id, { fontWeight: v }));
   bindSelect('prop-align', (v) => Elements.update(id, { align: v }));
-  bindInput('prop-maxWidth', (v) => {
-    const parsed = parseInt(v);
-    Elements.update(id, { maxWidth: isNaN(parsed) ? undefined : parsed });
-  });
+  bindNumber('prop-width', (v) => Elements.update(id, { width: v }));
+  bindNumber('prop-height', (v) => Elements.update(id, { height: v }));
+  bindNumber('prop-letterSpacing', (v) => Elements.update(id, { letterSpacing: v }));
+  bindNumber('prop-lineHeight', (v) => Elements.update(id, { lineHeight: v }));
 
   bindSelect('prop-effect', (v) => {
     Elements.update(id, { effect: v });
@@ -236,10 +334,18 @@ function renderTextInspector(el) {
 }
 
 function renderRectInspector(el) {
+  currentEl = el;
   inspectorContent.innerHTML = `
     <div class="inspector__header">
       <span class="inspector__title">Rectangle</span>
       <button class="btn btn--ghost btn--sm" title="Delete element" aria-label="Delete element" onclick="document.dispatchEvent(new CustomEvent('ob:delete', {detail:${el._id}}))"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+    </div>
+    <div class="inspector__section">
+      <div class="inspector__section-title">Layer</div>
+      <div class="form-group">
+        <label class="form-label">Layer Name</label>
+        <input type="text" class="form-input form-input--sm" id="prop-name" value="${escapeHTML(el.name || '')}" placeholder="Rectangle">
+      </div>
     </div>
     <div class="inspector__section">
       <div class="inspector__section-title">Position</div>
@@ -272,8 +378,8 @@ function renderRectInspector(el) {
       <div class="form-group">
         <label class="form-label">Color</label>
         <div style="display:flex;gap:var(--ob-space-2);align-items:center;">
-          <input type="color" class="form-input" id="prop-color" value="${el.color.startsWith('rgba') ? '#000000' : el.color}" style="width:40px;">
-          <input type="text" class="form-input form-input--sm" id="prop-color-text" value="${el.color}" style="flex:1;font-family:var(--ob-font-mono);font-size:var(--ob-text-xs);">
+          <input type="color" class="form-input" id="prop-color" value="${el.color.startsWith('rgba') ? '#000000' : escapeHTML(el.color)}" style="width:40px;">
+          <input type="text" class="form-input form-input--sm" id="prop-color-text" value="${escapeHTML(el.color)}" style="flex:1;font-family:var(--ob-font-mono);font-size:var(--ob-text-xs);">
         </div>
       </div>
       <div class="form-group">
@@ -283,7 +389,16 @@ function renderRectInspector(el) {
     </div>
   `;
 
+  syncSpec = [
+    { id: 'prop-name', prop: 'name', blank: true },
+    { id: 'prop-left', prop: 'left' },
+    { id: 'prop-top', prop: 'top' },
+    { id: 'prop-width', prop: 'width' },
+    { id: 'prop-height', prop: 'height' },
+  ];
+
   const id = el._id;
+  bindInput('prop-name', (v) => Elements.update(id, { name: v }));
   bindInput('prop-left', (v) => Elements.update(id, { left: parseInt(v) }));
   bindInput('prop-top', (v) => Elements.update(id, { top: parseInt(v) }));
   bindInput('prop-width', (v) => Elements.update(id, { width: parseInt(v) }));
@@ -304,10 +419,18 @@ function renderRectInspector(el) {
 }
 
 function renderImageInspector(el) {
+  currentEl = el;
   inspectorContent.innerHTML = `
     <div class="inspector__header">
       <span class="inspector__title">Image</span>
       <button class="btn btn--ghost btn--sm" title="Delete element" aria-label="Delete element" onclick="document.dispatchEvent(new CustomEvent('ob:delete', {detail:${el._id}}))"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+    </div>
+    <div class="inspector__section">
+      <div class="inspector__section-title">Layer</div>
+      <div class="form-group">
+        <label class="form-label">Layer Name</label>
+        <input type="text" class="form-input form-input--sm" id="prop-name" value="${escapeHTML(el.name || '')}" placeholder="Image">
+      </div>
     </div>
     <div class="inspector__section">
       <div class="inspector__section-title">Source</div>
@@ -351,7 +474,17 @@ function renderImageInspector(el) {
     </div>
   `;
 
+  syncSpec = [
+    { id: 'prop-name', prop: 'name', blank: true },
+    { id: 'prop-src', prop: 'src' },
+    { id: 'prop-left', prop: 'left' },
+    { id: 'prop-top', prop: 'top' },
+    { id: 'prop-width', prop: 'width' },
+    { id: 'prop-height', prop: 'height' },
+  ];
+
   const id = el._id;
+  bindInput('prop-name', (v) => Elements.update(id, { name: v }));
   document.getElementById('prop-src').addEventListener('change', (e) => {
     Elements.update(id, { src: e.target.value });
   });
@@ -384,6 +517,16 @@ function bindSelect(id, fn) {
   const el = document.getElementById(id);
   if (!el) return;
   el.addEventListener('change', () => fn(el.value));
+}
+
+/** Number field that accepts blanks (empty → undefined). Fires on change. */
+function bindNumber(id, fn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('change', () => {
+    const v = parseFloat(el.value);
+    fn(isNaN(v) ? undefined : v);
+  });
 }
 
 function bindColorPair(colorId, textId, fn) {

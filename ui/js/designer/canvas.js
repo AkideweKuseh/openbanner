@@ -41,6 +41,9 @@ let resizeStartX = 0;
 let resizeStartY = 0;
 let resizeElStart = {};
 
+// Layer drag-to-reorder state
+let draggedLayerId = null;
+
 let viewport, wrapper, frame;
 
 export function getCanvasState() { return { ...canvasState }; }
@@ -169,7 +172,12 @@ function onViewportMouseDown(e) {
     resizeHandle = dir;
     resizeStartX = e.clientX;
     resizeStartY = e.clientY;
-    resizeElStart = { left: el.left, top: el.top, width: el.width || 100, height: el.height || 50, fontSize: el.fontSize };
+    // For text with no explicit size, seed from the rendered box so the first drag turns
+    // it into a sized "placeholder" box instead of jumping from a 100×50 default.
+    const startNode = handleNode.closest('.canvas-element');
+    const startWidth = el.width != null ? el.width : Math.max(10, Math.round(startNode.offsetWidth));
+    const startHeight = el.height != null ? el.height : Math.max(10, Math.round(startNode.offsetHeight));
+    resizeElStart = { left: el.left, top: el.top, width: startWidth, height: startHeight, fontSize: el.fontSize };
     return;
   }
 
@@ -241,12 +249,19 @@ function onMouseMove(e) {
     const props = {};
 
     if (el.type === 'text') {
-      // For text, resize = change fontSize
-      if (resizeHandle.includes('s') || resizeHandle.includes('n')) {
-        const newSize = resizeElStart.fontSize + (resizeHandle.includes('n') ? -dy : dy);
-        props.fontSize = Math.max(8, Math.min(400, Math.round(newSize)));
+      // For text, resize = size the box (wraps width, clips height). Same math as below.
+      if (resizeHandle.includes('e')) {
+        props.width = resizeElStart.width + dx;
+      }
+      if (resizeHandle.includes('w')) {
+        props.width = resizeElStart.width - dx;
+        props.left = resizeElStart.left + dx;
+      }
+      if (resizeHandle.includes('s')) {
+        props.height = resizeElStart.height + dy;
       }
       if (resizeHandle.includes('n')) {
+        props.height = resizeElStart.height - dy;
         props.top = resizeElStart.top + dy;
       }
     } else {
@@ -507,10 +522,14 @@ function createElementNode(el, isSelected) {
     div.style.cssText = `
       position: absolute;
       left: ${el.left}px; top: ${el.top}px;
+      ${el.width ? `width: ${el.width}px;` : ''}
+      ${el.height ? `height: ${el.height}px; overflow: hidden;` : ''}
       font-size: ${el.fontSize}px;
       font-family: "${el.fontFamily || 'Inter'}", sans-serif;
       font-weight: ${el.fontWeight};
       ${el.maxWidth ? `max-width: ${el.maxWidth}px;` : ''}
+      ${el.letterSpacing != null ? `letter-spacing: ${el.letterSpacing}px;` : ''}
+      ${el.lineHeight != null ? `line-height: ${el.lineHeight};` : ''}
       text-align: ${align};
       ${transform ? `transform: ${transform};` : ''}
       ${getTextEffectCSS(el)}
@@ -580,9 +599,9 @@ function getTextEffectCSS(el) {
 }
 
 function createResizeHandles(isText) {
-  const dirs = isText
-    ? ['n', 's']
-    : ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+  // Text boxes now resize as a box (width/height) just like rects/images, so they all
+  // share the same 8-handle set. Font size is controlled from the inspector.
+  const dirs = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
   return '<div class="resize-handles">' +
     dirs.map(d => `<div class="resize-handle resize-handle--${d}" data-dir="${d}"></div>`).join('') +
@@ -608,13 +627,18 @@ function renderLayers(elements, selectedId) {
       rect: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"></rect></svg>',
       image: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>'
     };
-    const label = el.type === 'text'
+    const fallback = el.type === 'text'
       ? (el.text.substring(0, 18) + (el.text.length > 18 ? '…' : ''))
       : (el.type.charAt(0).toUpperCase() + el.type.slice(1));
+    const rawName = (el.name || '').trim();
+    const label = rawName ? (rawName.length > 24 ? rawName.substring(0, 24) + '…' : rawName) : fallback;
 
     const div = document.createElement('div');
     div.className = 'layer-item' + (isSelected ? ' layer-item--selected' : '');
+    // Drag-to-reorder: the whole row is draggable; the action buttons still click normally.
+    div.draggable = true;
     div.innerHTML = `
+      <span class="layer-item__grip" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="2" cy="2" r="1.2"/><circle cx="8" cy="2" r="1.2"/><circle cx="2" cy="7" r="1.2"/><circle cx="8" cy="7" r="1.2"/><circle cx="2" cy="12" r="1.2"/><circle cx="8" cy="12" r="1.2"/></svg></span>
       <span class="layer-item__icon">${icons[el.type] || icons.rect}</span>
       <span class="layer-item__name">${escapeHTML(label)}</span>
       <div class="layer-item__actions">
@@ -636,8 +660,51 @@ function renderLayers(elements, selectedId) {
       Elements.select(el._id);
     });
 
+    // ── Native drag-and-drop reordering ──
+    div.addEventListener('dragstart', (e) => {
+      draggedLayerId = el._id;
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', String(el._id)); } catch { /* Firefox needs this */ }
+      div.classList.add('layer-item--dragging');
+    });
+    div.addEventListener('dragend', () => {
+      draggedLayerId = null;
+      clearLayerDropIndicators();
+    });
+    div.addEventListener('dragover', (e) => {
+      if (draggedLayerId == null || draggedLayerId === el._id) return;
+      e.preventDefault(); // allow drop
+      e.dataTransfer.dropEffect = 'move';
+      const rect = div.getBoundingClientRect();
+      const above = e.clientY < rect.top + rect.height / 2;
+      clearLayerDropIndicators(div);
+      div.classList.add(above ? 'layer-item--drop-above' : 'layer-item--drop-below');
+    });
+    div.addEventListener('dragleave', (e) => {
+      // Only clear when leaving the row entirely (not when crossing child elements).
+      if (!div.contains(e.relatedTarget)) {
+        div.classList.remove('layer-item--drop-above', 'layer-item--drop-below');
+      }
+    });
+    div.addEventListener('drop', (e) => {
+      if (draggedLayerId == null || draggedLayerId === el._id) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = div.getBoundingClientRect();
+      const place = (e.clientY < rect.top + rect.height / 2) ? 'before' : 'after';
+      Elements.reorder(draggedLayerId, el._id, place);
+      clearLayerDropIndicators();
+    });
+
     list.appendChild(div);
   }
+}
+
+/** Remove drop-position indicators from all layer rows (optionally keeping one). */
+function clearLayerDropIndicators(except) {
+  document.querySelectorAll('.layer-item--drop-above, .layer-item--drop-below').forEach(n => {
+    if (n !== except) n.classList.remove('layer-item--drop-above', 'layer-item--drop-below');
+  });
 }
 
 function escapeHTML(str) {

@@ -14,6 +14,8 @@ const fontWeight = z.union([
 const baseEl = {
   left: z.number().int().min(-4000).max(4000),
   top: z.number().int().min(-4000).max(4000),
+  // UI-only label for the element (shown in the Layers panel). Optional, ignored at render.
+  name: z.string().max(120).optional(),
 };
 
 // Font family names like "Inter", "Playfair Display", "JetBrains Mono".
@@ -32,6 +34,14 @@ const textEl = z.object({
   color: cssColor.default('#ffffff'),
   fontWeight: fontWeight.default('bold'),
   maxWidth: z.number().int().min(1).max(4000).optional(),
+  // Optional fixed box: when set, the text wraps at `width` and (if `height` is set)
+  // clips to it — turning a text element into a sized "placeholder" frame.
+  width: z.number().int().min(1).max(4000).optional(),
+  height: z.number().int().min(1).max(4000).optional(),
+  // Typography fine-tuning. letterSpacing is in px (may be negative); lineHeight is a
+  // unitless multiplier (e.g. 1.2).
+  letterSpacing: z.number().min(-50).max(200).optional(),
+  lineHeight: z.number().min(0.1).max(10).optional(),
   effect: z.enum(['none', 'gradient', 'neon']).default('none'),
   // Horizontal anchor for the text. `left` (default) grows rightward from (left,top);
   // `center` keeps the text centered on x=left; `right` anchors its right edge at x=left.

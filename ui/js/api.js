@@ -4,29 +4,41 @@
 
 const STORAGE_KEY_URL = 'ob_api_url';
 const STORAGE_KEY_KEY = 'ob_api_key';
+// Set once the first time the user configures the API, and never cleared — so the config
+// prompt only ever auto-opens on a truly fresh install, not on every session.
+const STORAGE_KEY_CONFIGURED_ONCE = 'ob_api_configured_once';
 
 class OpenBannerAPI {
   constructor() {
-    this.baseUrl = sessionStorage.getItem(STORAGE_KEY_URL) || '';
-    this.apiKey = sessionStorage.getItem(STORAGE_KEY_KEY) || '';
+    // localStorage (not sessionStorage) so the connection survives a browser restart and
+    // the setup modal doesn't nag the user every time they reopen the app.
+    this.baseUrl = localStorage.getItem(STORAGE_KEY_URL) || '';
+    this.apiKey = localStorage.getItem(STORAGE_KEY_KEY) || '';
   }
 
   get isConfigured() {
     return this.baseUrl.length > 0 && this.apiKey.length > 0;
   }
 
+  /** True once the user has configured the API at least once (persists across clears). */
+  get configuredOnce() {
+    return localStorage.getItem(STORAGE_KEY_CONFIGURED_ONCE) === '1';
+  }
+
   configure(baseUrl, apiKey) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.apiKey = apiKey;
-    sessionStorage.setItem(STORAGE_KEY_URL, this.baseUrl);
-    sessionStorage.setItem(STORAGE_KEY_KEY, this.apiKey);
+    localStorage.setItem(STORAGE_KEY_URL, this.baseUrl);
+    localStorage.setItem(STORAGE_KEY_KEY, this.apiKey);
+    localStorage.setItem(STORAGE_KEY_CONFIGURED_ONCE, '1');
   }
 
   clear() {
     this.baseUrl = '';
     this.apiKey = '';
-    sessionStorage.removeItem(STORAGE_KEY_URL);
-    sessionStorage.removeItem(STORAGE_KEY_KEY);
+    localStorage.removeItem(STORAGE_KEY_URL);
+    localStorage.removeItem(STORAGE_KEY_KEY);
+    // Intentionally do NOT clear CONFIGURED_ONCE — see comment above.
   }
 
   /** POST /v1/render — returns a Blob (image) */
